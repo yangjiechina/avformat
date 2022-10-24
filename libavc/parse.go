@@ -1,6 +1,6 @@
 package libavc
 
-import "avformat/base"
+import "avformat/utils"
 
 func FindStartCode(p []byte, offset int) int {
 	length := len(p)
@@ -26,7 +26,7 @@ func FindStartCode(p []byte, offset int) int {
 	}
 }
 
-func FindStartCodeWithBuffer(buffer *base.ByteBuffer, offset int) int {
+func FindStartCodeWithBuffer(buffer *utils.ByteBuffer, offset int) int {
 	length := buffer.Size()
 	i := offset + 2
 
@@ -75,7 +75,7 @@ func IsKeyFrame(p []byte) bool {
 	}
 }
 
-func IsKeyFrameWithBuffer(buffer *base.ByteBuffer) bool {
+func IsKeyFrameWithBuffer(buffer *utils.ByteBuffer) bool {
 	index := 0
 	for {
 		index = FindStartCodeWithBuffer(buffer, index)
