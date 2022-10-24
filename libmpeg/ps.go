@@ -1,7 +1,7 @@
 package libmpeg
 
 import (
-	"avformat/base"
+	"avformat/utils"
 	"encoding/hex"
 	"fmt"
 )
@@ -81,7 +81,7 @@ type PacketHeader struct {
 }
 
 func (h *PacketHeader) ToBytes(dst []byte) int {
-	base.WriteDWORD(dst, PacketStartCode)
+	utils.WriteDWORD(dst, PacketStartCode)
 	//2bits 01
 	dst[4] = 0x40
 	//3bits [32..30]
@@ -260,7 +260,7 @@ func readSystemHeader(header *SystemHeader, src []byte) int {
 }
 
 func (h *SystemHeader) ToBytes(dst []byte) int {
-	base.WriteDWORD(dst, SystemHeaderStartCode)
+	utils.WriteDWORD(dst, SystemHeaderStartCode)
 	dst[6] = 0x80
 	dst[6] = dst[6] | byte(h.rateBound>>15)
 	dst[7] = byte(h.rateBound >> 7)
@@ -285,7 +285,7 @@ func (h *SystemHeader) ToBytes(dst []byte) int {
 		offset += (i + 1) * 3
 	}
 
-	base.WriteWORD(dst[4:], uint16(offset-6))
+	utils.WriteWORD(dst[4:], uint16(offset-6))
 	return offset
 }
 
@@ -377,7 +377,7 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 	if length < 16 {
 		return 0, nil
 	}
-	totalLength := 6 + base.BytesToInt(src[4], src[5])
+	totalLength := 6 + utils.BytesToInt(src[4], src[5])
 	if totalLength > length {
 		return 0, nil
 	}
@@ -386,7 +386,7 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 	header.currentNextIndicator = src[6] >> 7
 	header.version = src[6] & 0x1F
 
-	infoLength := base.BytesToInt(src[8], src[9])
+	infoLength := utils.BytesToInt(src[8], src[9])
 	offset := 10
 	if infoLength > 0 {
 		// +2 reserved elementary_stream_map_length
@@ -398,14 +398,14 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 		header.info = src[10:offset]
 	}
 
-	elementaryLength := base.BytesToInt(src[offset], src[offset+1])
+	elementaryLength := utils.BytesToInt(src[offset], src[offset+1])
 	offset += 2
 	if offset+elementaryLength > totalLength-4 {
 		return 0, fmt.Errorf("bad bytes:%s", hex.EncodeToString(src))
 	}
 
 	for i := offset; i < offset+elementaryLength; i += 4 {
-		eInfoLength := base.BytesToInt(src[i+2], src[i+3])
+		eInfoLength := utils.BytesToInt(src[i+2], src[i+3])
 
 		if _, ok := header.findElementaryStream(src[i+1]); !ok {
 			element := ElementaryStream{}
@@ -426,13 +426,13 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 		i += eInfoLength
 	}
 
-	header.crc32 = base.BytesToUInt32(src[totalLength-4], src[totalLength-3], src[totalLength-2], src[totalLength-1])
+	header.crc32 = utils.BytesToUInt32(src[totalLength-4], src[totalLength-3], src[totalLength-2], src[totalLength-1])
 
 	return totalLength, nil
 }
 
 func (h *ProgramStreamMap) ToBytes(dst []byte) int {
-	base.WriteDWORD(dst, PSMStartCode)
+	utils.WriteDWORD(dst, PSMStartCode)
 	//current_next_indicator
 	dst[6] = 0x80
 	//reserved
@@ -448,10 +448,10 @@ func (h *ProgramStreamMap) ToBytes(dst []byte) int {
 	if h.info != nil {
 		length := len(h.info)
 		copy(dst[offset:], h.info)
-		base.WriteWORD(dst[8:], uint16(length))
+		utils.WriteWORD(dst[8:], uint16(length))
 		offset += length
 	} else {
-		base.WriteWORD(dst[8:], 0)
+		utils.WriteWORD(dst[8:], 0)
 	}
 	//elementary length
 	offset += 2
@@ -464,21 +464,21 @@ func (h *ProgramStreamMap) ToBytes(dst []byte) int {
 		if elementaryStream.info != nil {
 			length := len(elementaryStream.info)
 			copy(dst[offset:], elementaryStream.info)
-			base.WriteWORD(dst[offset-2:], uint16(length))
+			utils.WriteWORD(dst[offset-2:], uint16(length))
 			offset += length
 		} else {
-			base.WriteWORD(dst[offset-2:], 0)
+			utils.WriteWORD(dst[offset-2:], 0)
 		}
 	}
 
 	elementaryLength := offset - temp
-	base.WriteWORD(dst[temp-2:], uint16(elementaryLength))
+	utils.WriteWORD(dst[temp-2:], uint16(elementaryLength))
 
-	crc32 := base.CalculateCrcMpeg2(dst[:offset])
-	base.WriteDWORD(dst[offset:], crc32)
+	crc32 := utils.CalculateCrcMpeg2(dst[:offset])
+	utils.WriteDWORD(dst[offset:], crc32)
 
 	offset += 4
-	base.WriteWORD(dst[4:], uint16(offset-6))
+	utils.WriteWORD(dst[4:], uint16(offset-6))
 
 	return offset
 }
@@ -621,7 +621,7 @@ func readPESPacket(p *PESPacket, src []byte) ([]byte, int) {
 	}
 
 	p.streamId = src[3]
-	packetLength := base.BytesToInt(src[4], src[5])
+	packetLength := utils.BytesToInt(src[4], src[5])
 	totalLength := 6 + packetLength
 	if totalLength > length {
 		return nil, 0

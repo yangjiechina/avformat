@@ -1,8 +1,8 @@
 package libmpeg
 
 import (
-	"avformat/base"
 	"avformat/libavc"
+	"avformat/utils"
 	"bufio"
 	"fmt"
 	"io"
@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-type deHandler func(buffer *base.ByteBuffer, keyFrame bool, streamType int, pts, dts int64)
+type deHandler func(buffer *utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64)
 
 type DeMuxer struct {
 	handler          deHandler
@@ -20,7 +20,7 @@ type DeMuxer struct {
 	lastPesPacket    *PESPacket
 	currentPesPacket *PESPacket
 
-	packet     *base.Packet
+	packet     *utils.Packet
 	streamType byte
 }
 
@@ -169,6 +169,6 @@ func NewDeMuxer(handler deHandler) *DeMuxer {
 		systemHeader:     &SystemHeader{},
 		programStreamMap: &ProgramStreamMap{},
 		currentPesPacket: NewPESPacket(),
-		packet:           base.NewPacket(),
+		packet:           utils.NewPacket(),
 	}
 }

@@ -1,7 +1,7 @@
 package libmpeg
 
 import (
-	"avformat/base"
+	"avformat/utils"
 	"fmt"
 	"os"
 	"testing"
@@ -17,12 +17,12 @@ func TestPSMuxer(t *testing.T) {
 		fileObj.Close()
 	}()
 
-	muxer := NewMuxer(func(index int, data []byte) {
+	muxer := NewMuxer(func(index int, data []byte, pts, dts int64) {
 		fileObj.Write(data)
 	})
 	streamIndex := make(map[int]int, 2)
 	count := 0
-	deMuxer := NewDeMuxer(func(buffer *base.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
+	deMuxer := NewDeMuxer(func(buffer *utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
 		fmt.Printf("count:%d type:%d length:%d keyFrame=%t pts:=%d dts:%d\r\n", count, streamType, buffer.Size(), keyFrame, pts, dts)
 		count++
 		index, ok := streamIndex[streamType]

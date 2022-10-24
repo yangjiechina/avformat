@@ -1,7 +1,7 @@
 package libmpeg
 
 import (
-	"avformat/base"
+	"avformat/utils"
 	"fmt"
 	"os"
 	"testing"
@@ -17,7 +17,7 @@ func TestDecodePS(t *testing.T) {
 		fileObj.Close()
 	}()
 	count := 0
-	deMuxer := NewDeMuxer(func(buffer *base.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
+	deMuxer := NewDeMuxer(func(buffer *utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
 		fmt.Printf("count:%d  type:%d length:%d keyFrame=%t pts:=%d dts:%d\r\n", count, streamType, buffer.Size(), keyFrame, pts, dts)
 		count++
 		buffer.ReadTo(func(bytes []byte) {

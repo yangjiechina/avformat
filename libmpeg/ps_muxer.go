@@ -1,7 +1,7 @@
 package libmpeg
 
 import (
-	"avformat/base"
+	"avformat/utils"
 	"fmt"
 	"math"
 )
@@ -9,7 +9,7 @@ import (
 const muxerBufferSize = 1024 * 1024 * 2
 const pesPacketSize = 65535 - 100
 
-type reHandler func(index int, data []byte)
+type encodeHandler func(index int, data []byte, pts, dts int64)
 
 type stream struct {
 	streamType int
@@ -22,14 +22,14 @@ func (s stream) isAudio() bool {
 
 type Muxer struct {
 	buffer       []byte
-	handler      reHandler
+	handler      encodeHandler
 	streams      []stream
 	packetHeader PacketHeader
 	systemHeader SystemHeader
 	psm          ProgramStreamMap
 }
 
-func NewMuxer(handler reHandler) *Muxer {
+func NewMuxer(handler encodeHandler) *Muxer {
 	m := &Muxer{
 		handler: handler,
 		buffer:  make([]byte, muxerBufferSize),
@@ -135,10 +135,10 @@ func (r *Muxer) Input(index int, keyFrame bool, data []byte, pts, dts int64) {
 	length := len(data)
 	pesCount := int(math.Ceil(float64(length) / pesPacketSize))
 	for j := 0; j < pesCount; j++ {
-		size := base.MinInt(length, pesPacketSize)
+		size := utils.MinInt(length, pesPacketSize)
 		n = s.pesPacket.ToBytes(r.buffer[i:])
 
-		base.WriteWORD(r.buffer[i+4:], uint16(size+n-6))
+		utils.WriteWORD(r.buffer[i+4:], uint16(size+n-6))
 		i += n
 		copy(r.buffer[i:], data[j*pesPacketSize:j*pesPacketSize+size])
 		i += size
@@ -148,7 +148,7 @@ func (r *Muxer) Input(index int, keyFrame bool, data []byte, pts, dts int64) {
 		s.pesPacket.ptsDtsFlags = 0x00
 	}
 
-	r.handler(index, r.buffer[:i])
+	r.handler(index, r.buffer[:i], pts, dts)
 }
 
 // InputWithMix 视频和音频打包到同一个ps包
