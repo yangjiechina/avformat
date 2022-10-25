@@ -22,12 +22,20 @@ func WriteInt(dst []byte, value, bytes int) {
 	}
 }
 
-func BytesToInt(b1 byte, b2 byte) int {
-	return int(b1)<<8 | int(b2)
+func BytesToUInt16(b1, b2 byte) uint16 {
+	return uint16(b1)<<8 | uint16(b2)
 }
 
-func BytesToUInt32(b1 byte, b2 byte, b3 byte, b4 byte) uint32 {
+func BytesToUInt24(b1, b2, b3 byte) uint32 {
+	return (uint32(b1) << 16) | (uint32(b2) << 8) | uint32(b3)
+}
+
+func BytesToUInt32(b1, b2, b3, b4 byte) uint32 {
 	return (uint32(b1) << 24) | (uint32(b2) << 16) | (uint32(b3) << 8) | uint32(b4)
+}
+
+func BytesToUInt64(b1, b2, b3, b4, b5 byte, b6 byte, b7 byte, b8 byte) uint64 {
+	return (uint64(b1) << 56) | (uint64(b2) << 48) | (uint64(b3) << 40) | (uint64(b4) << 32) | (uint64(b5) << 24) | (uint64(b6) << 16) | (uint64(b7) << 8) | uint64(b8)
 }
 
 func MinInt(a int, b int) int {

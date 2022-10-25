@@ -377,7 +377,7 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 	if length < 16 {
 		return 0, nil
 	}
-	totalLength := 6 + utils.BytesToInt(src[4], src[5])
+	totalLength := 6 + int(utils.BytesToUInt16(src[4], src[5]))
 	if totalLength > length {
 		return 0, nil
 	}
@@ -386,7 +386,7 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 	header.currentNextIndicator = src[6] >> 7
 	header.version = src[6] & 0x1F
 
-	infoLength := utils.BytesToInt(src[8], src[9])
+	infoLength := int(utils.BytesToUInt16(src[8], src[9]))
 	offset := 10
 	if infoLength > 0 {
 		// +2 reserved elementary_stream_map_length
@@ -398,14 +398,14 @@ func readProgramStreamMap(header *ProgramStreamMap, src []byte) (int, error) {
 		header.info = src[10:offset]
 	}
 
-	elementaryLength := utils.BytesToInt(src[offset], src[offset+1])
+	elementaryLength := int(utils.BytesToUInt16(src[offset], src[offset+1]))
 	offset += 2
 	if offset+elementaryLength > totalLength-4 {
 		return 0, fmt.Errorf("bad bytes:%s", hex.EncodeToString(src))
 	}
 
 	for i := offset; i < offset+elementaryLength; i += 4 {
-		eInfoLength := utils.BytesToInt(src[i+2], src[i+3])
+		eInfoLength := int(utils.BytesToUInt16(src[i+2], src[i+3]))
 
 		if _, ok := header.findElementaryStream(src[i+1]); !ok {
 			element := ElementaryStream{}
@@ -621,7 +621,7 @@ func readPESPacket(p *PESPacket, src []byte) ([]byte, int) {
 	}
 
 	p.streamId = src[3]
-	packetLength := utils.BytesToInt(src[4], src[5])
+	packetLength := int(utils.BytesToUInt16(src[4], src[5]))
 	totalLength := 6 + packetLength
 	if totalLength > length {
 		return nil, 0
