@@ -30,6 +30,7 @@ func (b *ByteBuffer) Release() {
 	b.data = nil
 	b.size = 0
 	b.itemSize = nil
+	b.readOffset = 0
 }
 
 func (b *ByteBuffer) ToBytes() []byte {
@@ -177,4 +178,11 @@ func (b *ByteBuffer) PeekUInt32() uint32 {
 
 func (b *ByteBuffer) PeekUInt64() uint64 {
 	return BytesToUInt64(b.At(b.readOffset), b.At(b.readOffset+1), b.At(b.readOffset+2), b.At(b.readOffset+3), b.At(b.readOffset+4), b.At(b.readOffset+5), b.At(b.readOffset+6), b.At(b.readOffset+7))
+}
+
+func (b *ByteBuffer) Skip(count int) {
+	b.readOffset += count
+	if b.readOffset >= b.size {
+		panic("slice index out of range")
+	}
 }
