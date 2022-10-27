@@ -130,8 +130,24 @@ func (b *ByteBuffer) ForEach(start int, handle func(i int, v byte) (bool, int)) 
 	}
 }
 
-func (b *ByteBuffer) ReadByte() byte {
-	i := b.PeekByte()
+func (b *ByteBuffer) ReadInt16() int16 {
+	return int16(b.ReadUInt16())
+}
+
+func (b *ByteBuffer) ReadInt24() int32 {
+	return int32(b.ReadUInt24())
+}
+
+func (b *ByteBuffer) ReadInt32() int32 {
+	return int32(b.ReadUInt32())
+}
+
+func (b *ByteBuffer) ReadInt64() int64 {
+	return int64(b.ReadUInt64())
+}
+
+func (b *ByteBuffer) ReadUInt8() uint8 {
+	i := b.PeekUInt8()
 	b.readOffset++
 	return i
 }
@@ -160,7 +176,7 @@ func (b *ByteBuffer) ReadUInt64() uint64 {
 	return i
 }
 
-func (b *ByteBuffer) PeekByte() byte {
+func (b *ByteBuffer) PeekUInt8() uint8 {
 	return b.At(b.readOffset)
 }
 
