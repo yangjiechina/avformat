@@ -32,48 +32,24 @@ func init() {
 		"subt": parseTrackReferenceTypeBox,
 		"trgr": parseTrackGroupBox,
 		"msrc": parseTrackGroupTypeBox,
-		"etds": parseTrackHeaderBox,
+		"edts": parseEditBox,
+		"elst": parseEditListBox,
+		"mdia": parseMediaBox,
+		"mdhd": parseMediaHeaderBox,
+		"hdlr": parseHandlerReferenceBox,
+		"elng": parseExtendedLanguageBox,
+		"minf": parseMediaInformationBox,
+		"vmhd": parseVideoMediaHeaderBox,
+		"smhd": parseSoundMediaHeaderBox,
+		"hmhd": parseHintMediaHeaderBox,
+		"sthd": parseSubtitleMediaHeaderBox,
+		"nmhd": parseNullMediaHeaderBox,
+		"dinf": parseDataInformationBox,
+		"dref": parseDataReferenceBox,
+		"url":  parseDataEntryUrlBox,
+		"urn":  parseDataEntryUrnBox,
+		"stbl": parseSampleTableBox,
 	}
-}
-
-func parseMediaHeaderBox(data []byte) (box, error) {
-	buffer := utils.NewByteBuffer(data)
-	version := buffer.ReadUInt8()
-	flags := buffer.ReadUInt24()
-	mdhd := mediaHeaderBox{fullBox: fullBox{version: version, flags: flags}}
-	if version == 1 {
-		mdhd.creationTime = buffer.ReadUInt64()
-		mdhd.modificationTime = buffer.ReadUInt64()
-		mdhd.timescale = buffer.ReadUInt32()
-		mdhd.duration = buffer.ReadUInt64()
-	} else { // version==0
-		mdhd.creationTime = uint64(buffer.ReadUInt32())
-		mdhd.modificationTime = uint64(buffer.ReadUInt32())
-		mdhd.timescale = buffer.ReadUInt32()
-		mdhd.duration = uint64(buffer.ReadUInt32())
-	}
-
-	language := buffer.ReadUInt16()
-	mdhd.pad = language>>15 == 1
-	mdhd.language[0] = byte(language >> 10 & 0x1F)
-	mdhd.language[1] = byte(language >> 5 & 0x1F)
-	mdhd.language[2] = byte(language & 0x1F)
-	mdhd.preDefined = buffer.ReadUInt16()
-
-	return &mdhd, nil
-}
-
-func parseHandlerReferenceBox(data []byte) (box, error) {
-	buffer := utils.NewByteBuffer(data)
-	version := buffer.ReadUInt8()
-	flags := buffer.ReadUInt24()
-	hdlr := handlerReferenceBox{fullBox: fullBox{version: version, flags: flags}}
-	hdlr.preDefined = buffer.ReadUInt32()
-	hdlr.handlerType = buffer.ReadUInt32()
-	buffer.Skip(12)
-	hdlr.name = string(data[24:])
-
-	return &hdlr, nil
 }
 
 func parseSampleDescriptionBox(data []byte) (box, error) {

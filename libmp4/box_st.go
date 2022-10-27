@@ -22,15 +22,6 @@ package libmp4
 //saio 8.7.9 sample auxiliary information offsets
 
 /**
-Box	Type:	 ‘stbl’
-Container:	 Media	Information	Box	(‘minf’)
-Mandatory:	Yes
-Quantity:	 Exactly	one
-*/
-type sampleTableBox struct {
-}
-
-/**
 Box	Types:	 ‘stsd’
 Container:	 Sample	Table	Box	(‘stbl’)
 Mandatory:	Yes

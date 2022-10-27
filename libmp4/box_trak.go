@@ -63,9 +63,45 @@ type trackGroupBox struct {
 //msrc
 type trackGroupTypeBox struct {
 	finalBox
-	fullBox
 	trackGroupType uint32
-	trackGroupId   uint32
+	fullBox
+	trackGroupId uint32
+}
+
+/**
+Box	Type:	 ‘edts’
+Container:	 Track	Box	(‘trak’)
+Mandatory:	No
+Quantity:	 Zero	or	one
+*/
+type editBox struct {
+	containerBox
+}
+
+/**
+Box	Type:	 ‘elst’
+Container:	 Edit	Box	(‘edts’)
+Mandatory:	No
+Quantity:	 Zero	or	one
+*/
+type editListBox struct {
+	fullBox
+	finalBox
+	entryCount        uint32
+	segmentDuration   []uint64
+	mediaTime         []int64
+	mediaRateInteger  []int16
+	mediaRateFraction []int16
+}
+
+/**
+Box	Type:	 ‘mdia’
+Container:	 Track	Box	(‘trak’)
+Mandatory:	Yes
+Quantity:	 Exactly	one*
+*/
+type mediaBox struct {
+	containerBox
 }
 
 func parseTrackHeaderBox(data []byte) (box, int, error) {
@@ -130,4 +166,32 @@ func parseTrackGroupTypeBox(data []byte) (box, int, error) {
 	trgr.trackGroupType = buffer.ReadUInt32()
 	trgr.trackGroupId = buffer.ReadUInt32()
 	return &trgr, containersBoxConsumeCount, nil
+}
+
+func parseEditBox(data []byte) (box, int, error) {
+	return &editBox{}, containersBoxConsumeCount, nil
+}
+
+func parseEditListBox(data []byte) (box, int, error) {
+	buffer := utils.NewByteBuffer(data)
+	version := buffer.ReadUInt8()
+	flags := buffer.ReadUInt24()
+	elst := editListBox{fullBox: fullBox{version: version, flags: flags}}
+	elst.entryCount = buffer.ReadUInt32()
+	for i := 0; i < int(elst.entryCount); i++ {
+		if elst.version == 1 {
+			elst.segmentDuration = append(elst.segmentDuration, buffer.ReadUInt64())
+			elst.mediaTime = append(elst.mediaTime, buffer.ReadInt64())
+		} else { // version==0
+			elst.segmentDuration = append(elst.segmentDuration, uint64(buffer.ReadUInt32()))
+			elst.mediaTime = append(elst.mediaTime, int64(buffer.ReadInt32()))
+		}
+		elst.mediaRateInteger = append(elst.mediaRateInteger, buffer.ReadInt16())
+		elst.mediaRateFraction = append(elst.mediaRateFraction, buffer.ReadInt16())
+	}
+	return &elst, len(data), nil
+}
+
+func parseMediaBox(data []byte) (box, int, error) {
+	return &mediaBox{}, containersBoxConsumeCount, nil
 }
