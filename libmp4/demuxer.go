@@ -11,20 +11,21 @@ func (d *DeMuxer) recursive(parent box, data []byte) (bool, error) {
 	r := newReader(data)
 	var size int64
 	for size = r.nextSize(); size > 0; {
-		t, _ := r.next(size)
-		println(t)
-		parse, ok := parsers[t]
+		name, n := r.next(size)
+		println(name)
+		parse, ok := parsers[name]
 		if !ok {
-			println("unKnow box type " + t)
-		}
-		b, consume, err := parse(data[r.offset-int(size) : r.offset])
-		if err != nil {
-			panic(err)
-		}
+			println("unKnow box type " + name)
+		} else {
+			b, consume, err := parse(data[r.offset-n : r.offset])
+			if err != nil {
+				panic(err)
+			}
 
-		parent.addChild(b)
-		if b.hasContainer() {
-			d.recursive(b, data[r.offset-int(size)+consume:r.offset])
+			parent.addChild(b)
+			if b.hasContainer() {
+				d.recursive(b, data[r.offset-n+int64(consume):r.offset])
+			}
 		}
 		size = r.nextSize()
 	}
@@ -43,8 +44,8 @@ func (d *DeMuxer) Read(path string) {
 		panic(err)
 	}
 	root := file{}
-	recursive, err := d.recursive(&root, all)
-	if recursive {
+	end, err := d.recursive(&root, all)
+	if end {
 		//解析子box
 	}
 
