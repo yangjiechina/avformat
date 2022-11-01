@@ -1,6 +1,9 @@
 package libmp4
 
-import "avformat/utils"
+import (
+	"avformat/utils"
+	"fmt"
+)
 
 /**
 Box	Type:	 ‘mdhd’
@@ -68,7 +71,7 @@ type sampleTableBox struct {
 	containerBox
 }
 
-func parseMediaHeaderBox(data []byte) (box, int, error) {
+func parseMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -95,7 +98,7 @@ func parseMediaHeaderBox(data []byte) (box, int, error) {
 	return &mdhd, len(data), nil
 }
 
-func parseHandlerReferenceBox(data []byte) (box, int, error) {
+func parseHandlerReferenceBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -108,7 +111,7 @@ func parseHandlerReferenceBox(data []byte) (box, int, error) {
 	return &hdlr, len(data), nil
 }
 
-func parseExtendedLanguageBox(data []byte) (box, int, error) {
+func parseExtendedLanguageBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -117,10 +120,40 @@ func parseExtendedLanguageBox(data []byte) (box, int, error) {
 	return &elng, len(data), nil
 }
 
-func parseMediaInformationBox(data []byte) (box, int, error) {
-	return &mediaInformationBox{}, containersBoxConsumeCount, nil
+func parseMediaInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+	buffer := utils.NewByteBuffer(data)
+	size := buffer.ReadUInt32()
+	buffer.ReadUInt32()
+	name := string(data[4:8])
+
+	switch name {
+	case mediaHandlerTypeVideo:
+		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeVideo
+		break
+	case mediaHandlerTypeAudio:
+		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeAudio
+		break
+	case mediaHandlerTypeHint:
+		return nil, -1, fmt.Errorf("not processed for %s box", name)
+	case mediaHandlerTypeSubTitle:
+		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeSubtitle
+		break
+	case mediaHandlerTypeNull:
+		return nil, -1, fmt.Errorf("not processed for %s box", name)
+	default:
+		return nil, -1, fmt.Errorf("unKnow box:%s", name)
+	}
+
+	parse := parsers[name]
+	if b, _, err := parse(ctx, data[8:size]); err != nil {
+		return nil, -1, err
+	} else {
+		m := &mediaInformationBox{}
+		m.addChild(b)
+		return m, containersBoxConsumeCount + int(size), nil
+	}
 }
 
-func parseSampleTableBox(data []byte) (box, int, error) {
+func parseSampleTableBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &sampleTableBox{}, containersBoxConsumeCount, nil
 }

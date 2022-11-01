@@ -198,7 +198,11 @@ func (b *ByteBuffer) PeekUInt64() uint64 {
 
 func (b *ByteBuffer) Skip(count int) {
 	b.readOffset += count
-	if b.readOffset >= b.size {
+	if b.readOffset > b.size {
 		panic("slice index out of range")
 	}
+}
+
+func (b *ByteBuffer) GetReadOffset() int {
+	return b.readOffset
 }

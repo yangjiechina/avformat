@@ -1,33 +1,42 @@
 package libmp4
 
 import (
+	"fmt"
 	"io/ioutil"
 )
 
 type DeMuxer struct {
+	ctx DeMuxContext
 }
 
-func (d *DeMuxer) recursive(parent box, data []byte) (bool, error) {
+type DeMuxContext struct {
+	root   *file
+	tracks []*track
+}
+
+func (d *DeMuxer) recursive(ctx *DeMuxContext, parent box, data []byte) (bool, error) {
 	r := newReader(data)
 	var size int64
-	for size = r.nextSize(); size > 0; {
+	for size = r.nextSize(); size > 0; size = r.nextSize() {
 		name, n := r.next(size)
-		println(name)
-		parse, ok := parsers[name]
-		if !ok {
-			println("unKnow box type " + name)
+		fmt.Printf("size:%d name:%s\r\n", size, name)
+
+		if parse, ok := parsers[name]; !ok {
+			return false, fmt.Errorf("unKnow box type:%s", name)
 		} else {
-			b, consume, err := parse(data[r.offset-n : r.offset])
+			b, consume, err := parse(ctx, data[r.offset-n:r.offset])
 			if err != nil {
-				panic(err)
+				return false, err
 			}
 
 			parent.addChild(b)
 			if b.hasContainer() {
-				d.recursive(b, data[r.offset-n+int64(consume):r.offset])
+				_, e := d.recursive(ctx, b, data[r.offset-n+int64(consume):r.offset])
+				if e != nil {
+					return false, e
+				}
 			}
 		}
-		size = r.nextSize()
 	}
 
 	//Not the last box. need more...
@@ -38,15 +47,32 @@ func (d *DeMuxer) recursive(parent box, data []byte) (bool, error) {
 	return true, nil
 }
 
+func buildIndex(ctx *DeMuxContext) error {
+	length := len(ctx.tracks)
+	if length == 0 {
+		return fmt.Errorf("uninvalid data")
+	}
+
+	for _, t := range ctx.tracks {
+		if t.mark>>27 != 0x1F {
+			return fmt.Errorf("uninvalid data")
+		}
+	}
+
+	return nil
+}
+
 func (d *DeMuxer) Read(path string) {
 	all, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
-	root := file{}
-	end, err := d.recursive(&root, all)
-	if end {
-		//解析子box
+	context := &DeMuxContext{}
+	context.root = &file{}
+	end, err := d.recursive(context, context.root, all)
+	if err != nil {
+		panic(end)
 	}
 
+	buildIndex(context)
 }

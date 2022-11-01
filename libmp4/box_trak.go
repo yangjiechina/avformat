@@ -104,7 +104,7 @@ type mediaBox struct {
 	containerBox
 }
 
-func parseTrackHeaderBox(data []byte) (box, int, error) {
+func parseTrackHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -137,11 +137,11 @@ func parseTrackHeaderBox(data []byte) (box, int, error) {
 	return &tkhd, len(data), nil
 }
 
-func parseTrackReferenceBox(data []byte) (box, int, error) {
+func parseTrackReferenceBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &trackReferenceBox{}, containersBoxConsumeCount, nil
 }
 
-func parseTrackReferenceTypeBox(data []byte) (box, int, error) {
+func parseTrackReferenceTypeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	trefType := trackReferenceTypeBox{}
 	trefType.referenceType = buffer.ReadUInt32()
@@ -154,11 +154,11 @@ func parseTrackReferenceTypeBox(data []byte) (box, int, error) {
 	return &trefType, len(data), nil
 }
 
-func parseTrackGroupBox(data []byte) (box, int, error) {
+func parseTrackGroupBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &trackGroupBox{}, containersBoxConsumeCount, nil
 }
 
-func parseTrackGroupTypeBox(data []byte) (box, int, error) {
+func parseTrackGroupTypeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -168,11 +168,11 @@ func parseTrackGroupTypeBox(data []byte) (box, int, error) {
 	return &trgr, containersBoxConsumeCount, nil
 }
 
-func parseEditBox(data []byte) (box, int, error) {
+func parseEditBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &editBox{}, containersBoxConsumeCount, nil
 }
 
-func parseEditListBox(data []byte) (box, int, error) {
+func parseEditListBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -192,6 +192,6 @@ func parseEditListBox(data []byte) (box, int, error) {
 	return &elst, len(data), nil
 }
 
-func parseMediaBox(data []byte) (box, int, error) {
+func parseMediaBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &mediaBox{}, containersBoxConsumeCount, nil
 }

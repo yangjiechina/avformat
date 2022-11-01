@@ -1,6 +1,9 @@
 package libmp4
 
-import "avformat/utils"
+import (
+	"avformat/utils"
+	"fmt"
+)
 
 //stsd * 8.5.2 sample descriptions (codec types, initialization
 //etc.)
@@ -73,7 +76,9 @@ Quantity:	 Zero	or	one
 type compositionTimeToSampleBox struct {
 	fullBox
 	finalBox
-	entryCount uint32
+	entryCount   uint32
+	sampleCount  []uint32
+	sampleOffset []uint32
 }
 
 /**
@@ -101,7 +106,8 @@ Quantity:	 Zero	or	one
 type syncSampleBox struct {
 	fullBox
 	finalBox
-	entryCount uint32
+	entryCount   uint32
+	sampleNumber []uint32
 }
 
 /**
@@ -146,7 +152,7 @@ type sampleSizeBox struct {
 type compactSampleSizeBox struct {
 	fullBox
 	finalBox
-	fieldSize   uint8
+	fieldSize   uint8 //4/8/16
 	sampleCount uint32
 	entrySize   []int64
 	//	for (i=1; i <= sample_count; i++) {
@@ -165,7 +171,7 @@ type sampleToChunkBox struct {
 	finalBox
 	entryCount             uint32
 	firstChunk             []uint32
-	samplesPerChunk        []uint32
+	samplesPerChunk        []uint32 //chunk中sample个数
 	sampleDescriptionIndex []uint32
 }
 
@@ -282,54 +288,166 @@ type sampleGroupDescriptionBox struct {
 	sampleEntries                 []sampleGroupDescriptionEntry
 }
 
-func parseSampleDescriptionBox(data []byte) (box, int, error) {
+type sampleEntry struct {
+}
+
+func parseSTSDVideo(t *track, size uint32, buffer *utils.ByteBuffer) {
+	offset := buffer.GetReadOffset()
+	//version
+	buffer.ReadUInt16()
+	//revision level
+	buffer.ReadUInt16()
+	//vendor
+	_ = buffer.ReadUInt32()
+	//temporal quality
+	buffer.ReadUInt32()
+	//spatial quality
+	buffer.ReadUInt32()
+
+	t.width = int(buffer.ReadUInt16())
+	t.height = int(buffer.ReadUInt16())
+	//horizSolution fixed value 0x00480000
+	buffer.ReadUInt32()
+	//vertSolution fixed value 0x00480000
+	buffer.ReadUInt32()
+	//reserved
+	buffer.ReadUInt32()
+	//frame count
+	_ = buffer.ReadUInt16()
+	//compressor name
+	buffer.Skip(32)
+	//depth fixed value 0x0018
+	buffer.ReadUInt16()
+	//pre defined -1
+	buffer.ReadInt16()
+
+	consume := buffer.GetReadOffset() - offset
+
+	buffer.Skip(int(size) - 16 - consume)
+}
+
+func parseSTSDAudio(t *track, size uint32, buffer *utils.ByteBuffer) {
+	offset := buffer.GetReadOffset()
+	//version
+	buffer.ReadUInt16()
+	//revision level
+	buffer.ReadUInt16()
+	//vendor
+	_ = buffer.ReadUInt32()
+	channelCount := int(buffer.ReadUInt16())
+	sampleSize := int(buffer.ReadUInt16())
+	preDefined := buffer.ReadUInt16()
+	//reserved
+	buffer.ReadUInt16()
+	sampleRate := buffer.ReadUInt32() >> 16
+	println(channelCount)
+	println(sampleSize)
+	println(preDefined)
+	println(sampleRate)
+
+	consume := buffer.GetReadOffset() - offset
+	buffer.Skip(int(size) - 16 - consume)
+}
+
+func parseSTSDSubtitle(t *track, size uint32, buffer *utils.ByteBuffer) {
+
+}
+
+func parseSampleDescriptionBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
 	stsd := sampleDescriptionBox{fullBox: fullBox{version: version, flags: flags}}
 	stsd.entryCount = buffer.ReadUInt32()
 
-	return &stsd, 8, nil
+	for i := 0; i < int(stsd.entryCount); i++ {
+		size := buffer.ReadUInt32()
+		format := buffer.ReadUInt32()
+		if size >= 16 {
+			//reserved
+			buffer.ReadUInt32()
+			buffer.ReadUInt16()
+			//data_reference_index
+			_ = buffer.ReadUInt16()
+		} else if size <= 7 {
+			return nil, -1, fmt.Errorf("invalid data")
+		}
+
+		trak := ctx.tracks[len(ctx.tracks)-1]
+		var ok bool
+		codecId := utils.AVCodecIdNONE
+		switch trak.codecType {
+		case utils.AVMediaTypeVideo:
+			codecId, ok = videoTags[format]
+			if ok {
+				parseSTSDVideo(trak, size, buffer)
+			}
+			break
+		case utils.AVMediaTypeAudio:
+			codecId, ok = audioTags[format]
+			if ok {
+				parseSTSDAudio(trak, size, buffer)
+			}
+			break
+		case utils.AVMediaTypeSubtitle:
+			codecId, ok = subtitleTags[format]
+			if ok {
+				parseSTSDSubtitle(trak, size, buffer)
+			}
+			break
+		}
+
+		if !ok {
+			return nil, -1, fmt.Errorf("not find codec id of the %d format in sample entry", format)
+		}
+
+		trak.codecId = codecId
+	}
+
+	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleDescription
+	ctx.tracks[len(ctx.tracks)-1].stsd = &stsd
+	return &stsd, len(data), nil
 }
 
-func parseDecodingTimeToSampleBox(data []byte) (box, int, error) {
+func parseDecodingTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
 	stts := decodingTimeToSampleBox{fullBox: fullBox{version: version, flags: flags}}
 	stts.entryCount = buffer.ReadUInt32()
-	stts.sampleCount = make([]uint32, 0, stts.entryCount)
-	stts.sampleDelta = make([]uint32, 0, stts.entryCount)
+	stts.sampleCount = make([]uint32, stts.entryCount)
+	stts.sampleDelta = make([]uint32, stts.entryCount)
 	for i := 0; i < int(stts.entryCount); i++ {
-		stts.sampleCount = append(stts.sampleCount, buffer.ReadUInt32())
-		stts.sampleDelta = append(stts.sampleDelta, buffer.ReadUInt32())
+		stts.sampleCount[i] = buffer.ReadUInt32()
+		stts.sampleDelta[i] = buffer.ReadUInt32()
 	}
-
+	ctx.tracks[len(ctx.tracks)-1].mark |= markTimeToSample
+	ctx.tracks[len(ctx.tracks)-1].stts = &stts
 	return &stts, len(data), nil
 }
 
-func parseCompositionTimeToSampleBox(data []byte) (box, int, error) {
+func parseCompositionTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
 	ctts := compositionTimeToSampleBox{fullBox: fullBox{version: version, flags: flags}}
 
 	ctts.entryCount = buffer.ReadUInt32()
+	ctts.sampleCount = make([]uint32, ctts.entryCount)
+	ctts.sampleOffset = make([]uint32, ctts.entryCount)
 	for i := 0; i < int(ctts.entryCount); i++ {
-		sampleCount := buffer.ReadUInt32()
-		println(sampleCount)
+		ctts.sampleCount[i] = buffer.ReadUInt32()
 		if version == 0 {
-			sampleOffset := buffer.ReadUInt32()
-			println(sampleOffset)
+			ctts.sampleCount[i] = buffer.ReadUInt32()
 		} else if version == 1 {
-			sampleOffset := buffer.ReadInt32()
-			println(sampleOffset)
+			ctts.sampleOffset[i] = uint32(buffer.ReadInt32())
 		}
 	}
+
 	return &ctts, len(data), nil
 }
 
-func parseCompositionToDecodeBox(data []byte) (box, int, error) {
+func parseCompositionToDecodeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -351,7 +469,7 @@ func parseCompositionToDecodeBox(data []byte) (box, int, error) {
 	return &cslg, len(data), nil
 }
 
-func parseSampleToChunkBox(data []byte) (box, int, error) {
+func parseSampleToChunkBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -360,17 +478,18 @@ func parseSampleToChunkBox(data []byte) (box, int, error) {
 
 	stsc.firstChunk = make([]uint32, stsc.entryCount)
 	stsc.samplesPerChunk = make([]uint32, stsc.entryCount)
-	stsc.sampleDescriptionIndex = make([]uint32, 0, stsc.entryCount)
+	stsc.sampleDescriptionIndex = make([]uint32, stsc.entryCount)
 	for i := 0; i < int(stsc.entryCount); i++ {
-		stsc.firstChunk = append(stsc.firstChunk, buffer.ReadUInt32())
-		stsc.samplesPerChunk = append(stsc.samplesPerChunk, buffer.ReadUInt32())
-		stsc.sampleDescriptionIndex = append(stsc.sampleDescriptionIndex, buffer.ReadUInt32())
+		stsc.firstChunk[i] = buffer.ReadUInt32()
+		stsc.samplesPerChunk[i] = buffer.ReadUInt32()
+		stsc.sampleDescriptionIndex[i] = buffer.ReadUInt32()
 	}
-
+	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleToChunk
+	ctx.tracks[len(ctx.tracks)-1].stsc = &stsc
 	return &stsc, len(data), nil
 }
 
-func parseSampleSizeBoxes(data []byte) (box, int, error) {
+func parseSampleSizeBoxes(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -378,15 +497,17 @@ func parseSampleSizeBoxes(data []byte) (box, int, error) {
 	stsz.sampleSize = buffer.ReadUInt32()
 	stsz.sampleCount = buffer.ReadUInt32()
 	if stsz.sampleSize == 0 {
+		stsz.entrySize = make([]uint32, stsz.sampleCount)
 		for i := 0; i < int(stsz.sampleCount); i++ {
-			stsz.entrySize = append(stsz.entrySize, buffer.ReadUInt32())
+			stsz.entrySize[i] = buffer.ReadUInt32()
 		}
 	}
-
+	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleSize
+	ctx.tracks[len(ctx.tracks)-1].stsz = &stsz
 	return &stsz, len(data), nil
 }
 
-func parseCompactSampleSizeBox(data []byte) (box, int, error) {
+func parseCompactSampleSizeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -396,25 +517,19 @@ func parseCompactSampleSizeBox(data []byte) (box, int, error) {
 	for i := 0; i < int(stz2.sampleCount); i++ {
 		//unsigned int(field_size) entry_size
 		switch stz2.fieldSize {
+		case 4:
+			//entry[i]<<4	+	entry[i+1]
 		case 8:
 			buffer.ReadUInt8()
-			break
 		case 16:
 			buffer.ReadUInt16()
-			break
-		case 32:
-			buffer.ReadUInt32()
-			break
-		case 64:
-			buffer.ReadUInt64()
-			break
 		}
 	}
 
 	return &stz2, len(data), nil
 }
 
-func parseChunkOffsetBox(data []byte) (box, int, error) {
+func parseChunkOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -424,11 +539,12 @@ func parseChunkOffsetBox(data []byte) (box, int, error) {
 	for i := 0; i < int(stco.entryCount); i++ {
 		stco.chunkOffset = append(stco.chunkOffset, buffer.ReadUInt32())
 	}
-
+	ctx.tracks[len(ctx.tracks)-1].mark |= markChunkOffset
+	ctx.tracks[len(ctx.tracks)-1].stco = &stco
 	return &stco, len(data), nil
 }
 
-func parseChunkLargeOffsetBox(data []byte) (box, int, error) {
+func parseChunkLargeOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -443,22 +559,22 @@ func parseChunkLargeOffsetBox(data []byte) (box, int, error) {
 	return &co64, len(data), nil
 }
 
-func parseSyncSampleBox(data []byte) (box, int, error) {
+func parseSyncSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
 	stss := syncSampleBox{fullBox: fullBox{version: version, flags: flags}}
 
 	stss.entryCount = buffer.ReadUInt32()
+	stss.sampleNumber = make([]uint32, stss.entryCount)
 	for i := 0; i < int(stss.entryCount); i++ {
-		sampleCount := buffer.ReadUInt32()
-		println(sampleCount)
+		stss.sampleNumber[i] = buffer.ReadUInt32()
 	}
 
 	return &stss, len(data), nil
 }
 
-func parseShadowSyncSampleBox(data []byte) (box, int, error) {
+func parseShadowSyncSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -475,7 +591,7 @@ func parseShadowSyncSampleBox(data []byte) (box, int, error) {
 	return &stsh, len(data), nil
 }
 
-func parsePaddingBitsBox(data []byte) (box, int, error) {
+func parsePaddingBitsBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -491,7 +607,7 @@ func parsePaddingBitsBox(data []byte) (box, int, error) {
 	return &padb, len(data), nil
 }
 
-func parseDegradationPriorityBox(data []byte) (box, int, error) {
+func parseDegradationPriorityBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -499,7 +615,7 @@ func parseDegradationPriorityBox(data []byte) (box, int, error) {
 	return &stdp, len(data), nil
 }
 
-func parseIndependentAndDisposableSamplesBox(data []byte) (box, int, error) {
+func parseIndependentAndDisposableSamplesBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -515,7 +631,7 @@ func parseIndependentAndDisposableSamplesBox(data []byte) (box, int, error) {
 	return &sdtp, len(data), nil
 }
 
-func parseSubSampleInformationBox(data []byte) (box, int, error) {
+func parseSubSampleInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -548,7 +664,7 @@ func parseSubSampleInformationBox(data []byte) (box, int, error) {
 	return &subs, len(data), nil
 }
 
-func parseSampleAuxiliaryInformationSizesBox(data []byte) (box, int, error) {
+func parseSampleAuxiliaryInformationSizesBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -565,7 +681,7 @@ func parseSampleAuxiliaryInformationSizesBox(data []byte) (box, int, error) {
 	return &saiz, len(data), nil
 }
 
-func parseSampleAuxiliaryInformationOffsetsBox(data []byte) (box, int, error) {
+func parseSampleAuxiliaryInformationOffsetsBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -579,7 +695,7 @@ func parseSampleAuxiliaryInformationOffsetsBox(data []byte) (box, int, error) {
 	return &saio, len(data), nil
 }
 
-func parseSampleToGroupBox(data []byte) (box, int, error) {
+func parseSampleToGroupBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -597,7 +713,7 @@ func parseSampleToGroupBox(data []byte) (box, int, error) {
 	return &sbgp, len(data), nil
 }
 
-func parseSampleGroupDescriptionBox(data []byte) (box, int, error) {
+func parseSampleGroupDescriptionBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()

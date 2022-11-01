@@ -1,6 +1,6 @@
 package libmp4
 
-type parser func(data []byte) (box, int, error)
+type parser func(ctx *DeMuxContext, data []byte) (box, int, error)
 
 const (
 	containersBoxConsumeCount = 0
