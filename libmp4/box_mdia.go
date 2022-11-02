@@ -71,7 +71,7 @@ type sampleTableBox struct {
 	containerBox
 }
 
-func parseMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -95,10 +95,12 @@ func parseMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	mdhd.language[2] = byte(language & 0x1F)
 	mdhd.preDefined = buffer.ReadUInt16()
 
+	ctx.tracks[len(ctx.tracks)-1].mark |= markMediaHeader
+	ctx.tracks[len(ctx.tracks)-1].mdhd = &mdhd
 	return &mdhd, len(data), nil
 }
 
-func parseHandlerReferenceBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseHandlerReferenceBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -111,7 +113,7 @@ func parseHandlerReferenceBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &hdlr, len(data), nil
 }
 
-func parseExtendedLanguageBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseExtendedLanguageBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -120,7 +122,7 @@ func parseExtendedLanguageBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &elng, len(data), nil
 }
 
-func parseMediaInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseMediaInformationBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	size := buffer.ReadUInt32()
 	buffer.ReadUInt32()
@@ -154,6 +156,6 @@ func parseMediaInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	}
 }
 
-func parseSampleTableBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleTableBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &sampleTableBox{}, containersBoxConsumeCount, nil
 }

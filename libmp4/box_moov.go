@@ -57,7 +57,7 @@ type userDataBox struct {
 	finalBox
 }
 
-func parseMovieHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseMovieHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -85,11 +85,11 @@ func parseMovieHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &mvhd, len(data), nil
 }
 
-func parseTrackBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseTrackBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	ctx.tracks = append(ctx.tracks, &track{})
 	return &trackBox{}, containersBoxConsumeCount, nil
 }
 
-func parseUserDataBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseUserDataBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &userDataBox{}, len(data), nil
 }

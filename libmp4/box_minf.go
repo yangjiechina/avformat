@@ -100,7 +100,7 @@ type dataEntryUrnBox struct {
 	location string
 }
 
-func parseVideoMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseVideoMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -112,7 +112,7 @@ func parseVideoMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &vmhd, len(data), nil
 }
 
-func parseSoundMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSoundMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -121,7 +121,7 @@ func parseSoundMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &smhd, len(data), nil
 }
 
-func parseHintMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseHintMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -133,7 +133,7 @@ func parseHintMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &hmhd, len(data), nil
 }
 
-func parseSubtitleMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSubtitleMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -141,7 +141,7 @@ func parseSubtitleMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, erro
 	return &sthd, len(data), nil
 }
 
-func parseNullMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseNullMediaHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -149,15 +149,15 @@ func parseNullMediaHeaderBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &nmhd, len(data), nil
 }
 
-func parseDataInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDataInformationBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &dataInformationBox{}, containersBoxConsumeCount, nil
 }
 
-func parseDataReferenceBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDataReferenceBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &dataReferenceBox{}, containersBoxConsumeCount, nil
 }
 
-func parseDataEntryUrlBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDataEntryUrlBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -166,7 +166,7 @@ func parseDataEntryUrlBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &url, len(data), nil
 }
 
-func parseDataEntryUrnBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDataEntryUrnBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()

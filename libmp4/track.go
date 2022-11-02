@@ -8,9 +8,19 @@ const (
 	markSampleToChunk     = 1 << 29
 	markChunkOffset       = 1 << 28
 	markSampleSize        = 1 << 27
+	markMediaHeader       = 1 << 26
+	markEditLit           = 1 << 25
+	markSyncSample        = 1 << 24
 	//chunkOffset64     = 1 << 28
 	//CompactSampleSize = 1 << 27
 )
+
+type sampleIndexEntry struct {
+	pos       int64 // the position in the file.
+	timestamp int64
+	size      uint32
+	keyFrame  bool
+}
 
 type track struct {
 	// mark the required box
@@ -23,11 +33,17 @@ type track struct {
 	width            int
 	height           int
 
+	sampleCount        uint32
+	chunkCount         uint32
+	currentSample      uint32
+	sampleIndexEntries []*sampleIndexEntry
+
+	mdhd *mediaHeaderBox
 	stsd *sampleDescriptionBox
 	stts *decodingTimeToSampleBox
 	stsc *sampleToChunkBox
 	stco *chunkOffsetBox
 	stsz *sampleSizeBox
-
 	stss *syncSampleBox
+	elst *editListBox
 }

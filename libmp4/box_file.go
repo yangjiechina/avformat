@@ -52,7 +52,7 @@ type movieBox struct {
 	containerBox
 }
 
-func parseFileTypeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseFileTypeBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	ftyp := fileTypeBox{}
 	ftyp.majorBrand = buffer.ReadUInt32()
@@ -65,15 +65,15 @@ func parseFileTypeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &ftyp, len(data), nil
 }
 
-func parseFreeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseFreeBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &freeBox{}, len(data), nil
 }
 
-func parseMediaDataBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseMediaDataBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	return &mediaDataBox{}, len(data), nil
 }
 
-func parseMovieBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseMovieBox(ctx *deMuxContext, data []byte) (box, int, error) {
 
 	return &movieBox{}, containersBoxConsumeCount, nil
 }

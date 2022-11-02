@@ -106,8 +106,9 @@ Quantity:	 Zero	or	one
 type syncSampleBox struct {
 	fullBox
 	finalBox
-	entryCount   uint32
-	sampleNumber []uint32
+	entryCount uint32
+	//sampleNumber []uint32
+	sampleNumber map[uint32]byte
 }
 
 /**
@@ -353,7 +354,7 @@ func parseSTSDSubtitle(t *track, size uint32, buffer *utils.ByteBuffer) {
 
 }
 
-func parseSampleDescriptionBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -409,7 +410,7 @@ func parseSampleDescriptionBox(ctx *DeMuxContext, data []byte) (box, int, error)
 	return &stsd, len(data), nil
 }
 
-func parseDecodingTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDecodingTimeToSampleBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -426,7 +427,7 @@ func parseDecodingTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, err
 	return &stts, len(data), nil
 }
 
-func parseCompositionTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseCompositionTimeToSampleBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -447,7 +448,7 @@ func parseCompositionTimeToSampleBox(ctx *DeMuxContext, data []byte) (box, int, 
 	return &ctts, len(data), nil
 }
 
-func parseCompositionToDecodeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseCompositionToDecodeBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -469,7 +470,7 @@ func parseCompositionToDecodeBox(ctx *DeMuxContext, data []byte) (box, int, erro
 	return &cslg, len(data), nil
 }
 
-func parseSampleToChunkBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleToChunkBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -489,7 +490,7 @@ func parseSampleToChunkBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &stsc, len(data), nil
 }
 
-func parseSampleSizeBoxes(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleSizeBoxes(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -507,7 +508,7 @@ func parseSampleSizeBoxes(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &stsz, len(data), nil
 }
 
-func parseCompactSampleSizeBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseCompactSampleSizeBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -529,7 +530,7 @@ func parseCompactSampleSizeBox(ctx *DeMuxContext, data []byte) (box, int, error)
 	return &stz2, len(data), nil
 }
 
-func parseChunkOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseChunkOffsetBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -544,7 +545,7 @@ func parseChunkOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &stco, len(data), nil
 }
 
-func parseChunkLargeOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseChunkLargeOffsetBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -559,22 +560,26 @@ func parseChunkLargeOffsetBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &co64, len(data), nil
 }
 
-func parseSyncSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSyncSampleBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
 	stss := syncSampleBox{fullBox: fullBox{version: version, flags: flags}}
 
 	stss.entryCount = buffer.ReadUInt32()
-	stss.sampleNumber = make([]uint32, stss.entryCount)
+	//stss.sampleNumber = make([]uint32, stss.entryCount)
+	stss.sampleNumber = make(map[uint32]byte, stss.entryCount)
 	for i := 0; i < int(stss.entryCount); i++ {
-		stss.sampleNumber[i] = buffer.ReadUInt32()
+		//stss.sampleNumber[i] = buffer.ReadUInt32()
+		stss.sampleNumber[buffer.ReadUInt32()] = 0
 	}
 
+	ctx.tracks[len(ctx.tracks)-1].mark |= markSyncSample
+	ctx.tracks[len(ctx.tracks)-1].stss = &stss
 	return &stss, len(data), nil
 }
 
-func parseShadowSyncSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseShadowSyncSampleBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -591,7 +596,7 @@ func parseShadowSyncSampleBox(ctx *DeMuxContext, data []byte) (box, int, error) 
 	return &stsh, len(data), nil
 }
 
-func parsePaddingBitsBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parsePaddingBitsBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -607,7 +612,7 @@ func parsePaddingBitsBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &padb, len(data), nil
 }
 
-func parseDegradationPriorityBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseDegradationPriorityBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -615,7 +620,7 @@ func parseDegradationPriorityBox(ctx *DeMuxContext, data []byte) (box, int, erro
 	return &stdp, len(data), nil
 }
 
-func parseIndependentAndDisposableSamplesBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseIndependentAndDisposableSamplesBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -631,7 +636,7 @@ func parseIndependentAndDisposableSamplesBox(ctx *DeMuxContext, data []byte) (bo
 	return &sdtp, len(data), nil
 }
 
-func parseSubSampleInformationBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSubSampleInformationBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -664,7 +669,7 @@ func parseSubSampleInformationBox(ctx *DeMuxContext, data []byte) (box, int, err
 	return &subs, len(data), nil
 }
 
-func parseSampleAuxiliaryInformationSizesBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleAuxiliaryInformationSizesBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -681,7 +686,7 @@ func parseSampleAuxiliaryInformationSizesBox(ctx *DeMuxContext, data []byte) (bo
 	return &saiz, len(data), nil
 }
 
-func parseSampleAuxiliaryInformationOffsetsBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleAuxiliaryInformationOffsetsBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -695,7 +700,7 @@ func parseSampleAuxiliaryInformationOffsetsBox(ctx *DeMuxContext, data []byte) (
 	return &saio, len(data), nil
 }
 
-func parseSampleToGroupBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleToGroupBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
@@ -713,7 +718,7 @@ func parseSampleToGroupBox(ctx *DeMuxContext, data []byte) (box, int, error) {
 	return &sbgp, len(data), nil
 }
 
-func parseSampleGroupDescriptionBox(ctx *DeMuxContext, data []byte) (box, int, error) {
+func parseSampleGroupDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error) {
 	buffer := utils.NewByteBuffer(data)
 	version := buffer.ReadUInt8()
 	flags := buffer.ReadUInt24()
