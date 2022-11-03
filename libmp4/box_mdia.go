@@ -128,17 +128,21 @@ func parseMediaInformationBox(ctx *deMuxContext, data []byte) (box, int, error) 
 	buffer.ReadUInt32()
 	name := string(data[4:8])
 
+	var metaData MetaData
 	switch name {
 	case mediaHandlerTypeVideo:
-		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeVideo
+		metaData = &VideoMetaData{}
+		metaData.setMediaType(utils.AVMediaTypeVideo)
 		break
 	case mediaHandlerTypeAudio:
-		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeAudio
+		metaData = &AudioMetaData{}
+		metaData.setMediaType(utils.AVMediaTypeAudio)
 		break
 	case mediaHandlerTypeHint:
 		return nil, -1, fmt.Errorf("not processed for %s box", name)
 	case mediaHandlerTypeSubTitle:
-		ctx.tracks[len(ctx.tracks)-1].codecType = utils.AVMediaTypeSubtitle
+		metaData = &SubTitleMetaData{}
+		metaData.setMediaType(utils.AVMediaTypeSubtitle)
 		break
 	case mediaHandlerTypeNull:
 		return nil, -1, fmt.Errorf("not processed for %s box", name)
@@ -146,6 +150,7 @@ func parseMediaInformationBox(ctx *deMuxContext, data []byte) (box, int, error) 
 		return nil, -1, fmt.Errorf("unKnow box:%s", name)
 	}
 
+	ctx.tracks[len(ctx.tracks)-1].metaData = metaData
 	parse := parsers[name]
 	if b, _, err := parse(ctx, data[8:size]); err != nil {
 		return nil, -1, err

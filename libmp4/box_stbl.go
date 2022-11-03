@@ -292,7 +292,7 @@ type sampleGroupDescriptionBox struct {
 type sampleEntry struct {
 }
 
-func parseSTSDVideo(t *track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	offset := buffer.GetReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -305,8 +305,8 @@ func parseSTSDVideo(t *track, size uint32, buffer *utils.ByteBuffer) {
 	//spatial quality
 	buffer.ReadUInt32()
 
-	t.width = int(buffer.ReadUInt16())
-	t.height = int(buffer.ReadUInt16())
+	t.metaData.(*VideoMetaData).width = int(buffer.ReadUInt16())
+	t.metaData.(*VideoMetaData).height = int(buffer.ReadUInt16())
 	//horizSolution fixed value 0x00480000
 	buffer.ReadUInt32()
 	//vertSolution fixed value 0x00480000
@@ -327,7 +327,7 @@ func parseSTSDVideo(t *track, size uint32, buffer *utils.ByteBuffer) {
 	buffer.Skip(int(size) - 16 - consume)
 }
 
-func parseSTSDAudio(t *track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	offset := buffer.GetReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -350,7 +350,7 @@ func parseSTSDAudio(t *track, size uint32, buffer *utils.ByteBuffer) {
 	buffer.Skip(int(size) - 16 - consume)
 }
 
-func parseSTSDSubtitle(t *track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDSubtitle(t *Track, size uint32, buffer *utils.ByteBuffer) {
 
 }
 
@@ -377,7 +377,7 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 		trak := ctx.tracks[len(ctx.tracks)-1]
 		var ok bool
 		codecId := utils.AVCodecIdNONE
-		switch trak.codecType {
+		switch trak.MetaData().MediaType() {
 		case utils.AVMediaTypeVideo:
 			codecId, ok = videoTags[format]
 			if ok {
@@ -402,7 +402,7 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 			return nil, -1, fmt.Errorf("not find codec id of the %d format in sample entry", format)
 		}
 
-		trak.codecId = codecId
+		trak.metaData.setCodeId(codecId)
 	}
 
 	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleDescription

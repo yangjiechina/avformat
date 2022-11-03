@@ -11,9 +11,9 @@ const (
 	BoxTypeMovie       = "moov"
 	BoxTypeMovieHeader = "mvhd"
 	BoxTypeUUID        = "uuid" // extension type
-	BoxTypeTrack       = "track"
+	BoxTypeTrack       = "Track"
 
-	//track type
+	//Track type
 	mediaHandlerTypeVideo    = "vmhd"
 	mediaHandlerTypeAudio    = "smhd"
 	mediaHandlerTypeHint     = "hmhd"
@@ -29,26 +29,26 @@ const (
 //moov * 8.2.1 container for all the metadata
 //mvhd * 8.2.2 movie header, overall declarations
 //meta 8.11.1 metadata
-//trak * 8.3.1 container for an individual track or stream
-//tkhd * 8.3.2 track header, overall information about the track
-//tref 8.3.3 track reference container
-//trgr 8.3.4 track grouping indication
+//trak * 8.3.1 container for an individual Track or stream
+//tkhd * 8.3.2 Track header, overall information about the Track
+//tref 8.3.3 Track reference container
+//trgr 8.3.4 Track grouping indication
 //edts 8.6.4 edit list container
 //elst 8.6.6 an edit list
 //meta 8.11.1 metadata
-//mdia * 8.4 container for the media information in a track
+//mdia * 8.4 container for the media information in a Track
 //mdhd * 8.4.2 media header, overall information about the media
 //hdlr * 8.4.3 handler, declares the media (handler) type
 //	elng 8.4.6 extended language tag
 //minf * 8.4.4 media information container
 //vmhd 12.1.2 video media header, overall information (video
-//track only)
+//Track only)
 //smhd 12.2.2 sound media header, overall information (sound
-//track only)
-//hmhd 12.4.2 hint media header, overall information (hint track
+//Track only)
+//hmhd 12.4.2 hint media header, overall information (hint Track
 //only)
 //sthd 12.6.2 subtitle media header, overall information (subtitle
-//track only)
+//Track only)
 //nmhd 8.4.5.2 Null media header, overall information (some
 //tracks only)
 //dinf * 8.7.1 data information box, container
@@ -56,7 +56,7 @@ const (
 //16 ©	ISO/IEC	2015	–	All	rights	reserved
 //Box types, structure, and cross-reference (Informative)
 //dref * 8.7.2 data reference box, declares source(s) of media
-//data in track
+//data in Track
 //stbl * 8.5.1 sample table box, container for the time/space
 //map
 //stsd * 8.5.2 sample descriptions (codec types, initialization
@@ -82,33 +82,33 @@ const (
 //udta 8.10.1 user-data
 //mvex 8.8.1 movie extends box
 //mehd 8.8.2 movie extends header box
-//trex * 8.8.3 track extends defaults
+//trex * 8.8.3 Track extends defaults
 //leva 8.8.13 level assignment
 //moof 8.8.4 movie fragment
 //mfhd * 8.8.5 movie fragment header
 //meta 8.11.1 metadata
-//traf 8.8.6 track fragment
-//tfhd * 8.8.7 track fragment header
-//trun 8.8.8 track fragment run
+//traf 8.8.6 Track fragment
+//tfhd * 8.8.7 Track fragment header
+//trun 8.8.8 Track fragment run
 //sbgp 8.9.2 sample-to-group
 //sgpd 8.9.3 sample group description
 //subs 8.7.7 sub-sample information
 //saiz 8.7.8 sample auxiliary information sizes
 //saio 8.7.9 sample auxiliary information offsets
-//tfdt 8.8.12 track fragment decode time
+//tfdt 8.8.12 Track fragment decode time
 //meta 8.11.1 metadata
 //mfra 8.8.9 movie fragment random access
-//tfra 8.8.10 track fragment random access
+//tfra 8.8.10 Track fragment random access
 //mfro * 8.8.11 movie fragment random access offset
 //mdat 8.2.2 media data container
 //free 8.1.2 free space
 //skip 8.1.2 free space
 //udta 8.10.1 user-data
 //cprt 8.10.2 copyright etc.
-//tsel 8.10.3 track selection box
-//strk 8.14.3 sub track box
-//stri 8.14.4 sub track information box
-//strd 8.14.5 sub track definition box
+//tsel 8.10.3 Track selection box
+//strk 8.14.3 sub Track box
+//stri 8.14.4 sub Track information box
+//strd 8.14.5 sub Track definition box
 //meta 8.11.1 metadata
 //hdlr * 8.4.3 handler, declares the metadata (handler) type
 //	dinf 8.7.1 data information box, container

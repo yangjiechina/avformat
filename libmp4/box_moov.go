@@ -86,7 +86,7 @@ func parseMovieHeaderBox(ctx *deMuxContext, data []byte) (box, int, error) {
 }
 
 func parseTrackBox(ctx *deMuxContext, data []byte) (box, int, error) {
-	ctx.tracks = append(ctx.tracks, &track{})
+	ctx.tracks = append(ctx.tracks, &Track{})
 	return &trackBox{}, containersBoxConsumeCount, nil
 }
 

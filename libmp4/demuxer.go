@@ -1,17 +1,28 @@
 package libmp4
 
 import (
+	"avformat/utils"
 	"fmt"
+	"io"
 	"io/ioutil"
 )
 
+type deMuxHandler func(data []byte, pts, dts int64, mediaType utils.AVMediaType, id utils.AVCodecID)
+
 type DeMuxer struct {
-	ctx deMuxContext
+	ctx          *deMuxContext
+	reader       *fileReader
+	sampleBuffer []byte
+	handler      deMuxHandler
+}
+
+func NewDeMuxer(handler deMuxHandler) *DeMuxer {
+	return &DeMuxer{handler: handler}
 }
 
 type deMuxContext struct {
 	root   *file
-	tracks []*track
+	tracks []*Track
 }
 
 func (d *DeMuxer) recursive(ctx *deMuxContext, parent box, data []byte) (bool, error) {
@@ -47,17 +58,19 @@ func (d *DeMuxer) recursive(ctx *deMuxContext, parent box, data []byte) (bool, e
 	return true, nil
 }
 
-func (d *deMuxContext) findNextTrack() {
-	/*for _, t := range d.tracks {
+func (d *DeMuxer) findNextTrack() *Track {
+	var trak *Track
+	for _, t := range d.ctx.tracks {
+		if t.currentSample >= t.sampleCount {
+			continue
+		}
 
-	}*/
-}
-
-func findNextSample(t *track) {
-	if t.currentSample+1 >= t.sampleCount {
-		return
+		if trak == nil || trak != nil && t.sampleIndexEntries[t.currentSample].pos < trak.sampleIndexEntries[trak.currentSample].pos {
+			trak = t
+		}
 	}
 
+	return trak
 }
 
 func buildIndex(ctx *deMuxContext) error {
@@ -129,17 +142,58 @@ func buildIndex(ctx *deMuxContext) error {
 	return nil
 }
 
-func (d *DeMuxer) Read(path string) {
-	all, err := ioutil.ReadFile(path)
-	if err != nil {
-		panic(err)
-	}
-	context := &deMuxContext{}
-	context.root = &file{}
-	end, err := d.recursive(context, context.root, all)
-	if err != nil {
-		panic(end)
+func (d *DeMuxer) Read() error {
+	nextTrack := d.findNextTrack()
+	if nextTrack == nil {
+		return io.EOF
 	}
 
-	buildIndex(context)
+	entry := nextTrack.sampleIndexEntries[nextTrack.currentSample]
+
+	if int(entry.size) > len(d.sampleBuffer) {
+		d.sampleBuffer = make([]byte, entry.size)
+	}
+
+	if err := d.reader.seek(entry.pos); err != nil {
+		return err
+	}
+
+	if _, err := d.reader.read(d.sampleBuffer[:entry.size]); err != nil {
+		return err
+	}
+	nextTrack.currentSample++
+	return nil
+}
+
+func (d *DeMuxer) TrackCount() int {
+	return len(d.ctx.tracks)
+}
+
+func (d *DeMuxer) FindTrack(mediaType utils.AVMediaType) *Track {
+	for _, track := range d.ctx.tracks {
+		if track.metaData.MediaType() == mediaType {
+			return track
+		}
+	}
+
+	return nil
+}
+
+func (d *DeMuxer) Open(path string) error {
+	all, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	context := &deMuxContext{}
+	context.root = &file{}
+	if _, err = d.recursive(context, context.root, all); err != nil {
+		return err
+	}
+
+	d.ctx = context
+	d.reader = &fileReader{}
+	_ = d.reader.open(path)
+	d.sampleBuffer = make([]byte, 1024*1024*2)
+	return buildIndex(context)
 }

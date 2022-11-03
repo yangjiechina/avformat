@@ -1,7 +1,5 @@
 package libmp4
 
-import "avformat/utils"
-
 const (
 	markSampleDescription = 1 << 31
 	markTimeToSample      = 1 << 30
@@ -22,16 +20,13 @@ type sampleIndexEntry struct {
 	keyFrame  bool
 }
 
-type track struct {
+type Track struct {
 	// mark the required box
 	mark uint32
 
 	//"vmhd""smhd""hmhd""sthd""nmhd"
 	mediaHandlerType string
-	codecType        utils.AVMediaType
-	codecId          utils.AVCodecID
-	width            int
-	height           int
+	metaData         MetaData
 
 	sampleCount        uint32
 	chunkCount         uint32
@@ -46,4 +41,8 @@ type track struct {
 	stsz *sampleSizeBox
 	stss *syncSampleBox
 	elst *editListBox
+}
+
+func (t *Track) MetaData() MetaData {
+	return t.metaData
 }
