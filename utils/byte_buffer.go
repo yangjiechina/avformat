@@ -11,14 +11,14 @@ type ByteBuffer struct {
 func NewByteBuffer(data ...[]byte) *ByteBuffer {
 	buffer := &ByteBuffer{}
 	for _, datum := range data {
-		buffer.Write(datum, 0, len(datum))
+		buffer.Write(datum)
 	}
 	return buffer
 }
 
-func (b *ByteBuffer) Write(data []byte, position, length int) {
-	b.data = append(b.data, data[position:position+length])
-	b.size += length
+func (b *ByteBuffer) Write(data []byte) {
+	b.data = append(b.data, data)
+	b.size += len(data)
 	b.itemSize = append(b.itemSize, b.size)
 }
 
@@ -46,7 +46,6 @@ func (b *ByteBuffer) ToBytes() []byte {
 	}
 
 	b.Release()
-
 	return dst
 }
 
@@ -66,6 +65,7 @@ func (b *ByteBuffer) ReadTo(handle func([]byte)) {
 	b.Release()
 }
 
+//返回readOffset在二维切片的索引
 func (b *ByteBuffer) offset() (int, int) {
 	if len(b.itemSize) == 1 {
 		return 0, b.readOffset
@@ -73,7 +73,11 @@ func (b *ByteBuffer) offset() (int, int) {
 
 	for i, v := range b.itemSize {
 		if b.readOffset < v {
-			return i, b.readOffset - b.itemSize[i-1]
+			if i > 0 {
+				return i, b.readOffset - b.itemSize[i-1]
+			} else {
+				return 0, b.readOffset
+			}
 		}
 	}
 
@@ -87,8 +91,13 @@ func (b *ByteBuffer) At(index int) byte {
 
 	for i, v := range b.itemSize {
 		if index < v {
-			return b.data[i][index-b.itemSize[i-1]]
+			if i > 0 {
+				return b.data[i][index-b.itemSize[i-1]]
+			} else {
+				return b.data[0][index]
+			}
 		}
+
 	}
 
 	panic("slice index out of range")
@@ -203,6 +212,29 @@ func (b *ByteBuffer) Skip(count int) {
 	}
 }
 
-func (b *ByteBuffer) GetReadOffset() int {
+func (b *ByteBuffer) ReadOffset() int {
 	return b.readOffset
+}
+
+func (b *ByteBuffer) ReadableBytes() int {
+	return b.size - b.readOffset
+}
+
+func (b *ByteBuffer) ReadBytes(dst []byte) {
+	line, column := b.offset()
+	data := b.data[line:]
+	length, index := len(dst), 0
+
+	for i := 0; length > 0 && i < len(data); i++ {
+		bytes := b.data[i]
+		if i == 0 {
+			bytes = bytes[column:]
+		}
+
+		size := MinInt(length, len(bytes))
+		copy(dst[index:], bytes[:size])
+		length -= size
+		index += size
+		b.readOffset += size
+	}
 }

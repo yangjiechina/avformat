@@ -27,7 +27,7 @@ func (p *Packet) Data() *ByteBuffer {
 }
 
 func (p *Packet) Write(data []byte) {
-	p.data.Write(data, 0, len(data))
+	p.data.Write(data)
 }
 func (p *Packet) Release() {
 	p.data.Release()

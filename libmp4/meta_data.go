@@ -5,31 +5,46 @@ import "avformat/utils"
 type MetaData interface {
 	MediaType() utils.AVMediaType
 	CodeId() utils.AVCodecID
+	extraData() []byte
 	setMediaType(mediaType utils.AVMediaType)
 	setCodeId(id utils.AVCodecID)
+	setExtraData(data []byte)
+}
+
+type metaDataImpl struct {
+	mediaType utils.AVMediaType
+	codecId   utils.AVCodecID
+	extra     []byte
+}
+
+func (m *metaDataImpl) MediaType() utils.AVMediaType {
+	return m.mediaType
+}
+
+func (m *metaDataImpl) CodeId() utils.AVCodecID {
+	return m.codecId
+}
+
+func (m *metaDataImpl) extraData() []byte {
+	return m.extra
+}
+
+func (m *metaDataImpl) setMediaType(mediaType utils.AVMediaType) {
+	m.mediaType = mediaType
+}
+
+func (m *metaDataImpl) setCodeId(id utils.AVCodecID) {
+	m.codecId = id
+}
+
+func (m *metaDataImpl) setExtraData(data []byte) {
+	m.extra = data
 }
 
 type VideoMetaData struct {
-	mediaType utils.AVMediaType
-	codecId   utils.AVCodecID
-	width     int
-	height    int
-}
-
-func (v *VideoMetaData) MediaType() utils.AVMediaType {
-	return v.mediaType
-}
-
-func (v *VideoMetaData) CodeId() utils.AVCodecID {
-	return v.codecId
-}
-
-func (v *VideoMetaData) setMediaType(mediaType utils.AVMediaType) {
-	v.mediaType = mediaType
-}
-
-func (v *VideoMetaData) setCodeId(id utils.AVCodecID) {
-	v.codecId = id
+	metaDataImpl
+	width  int
+	height int
 }
 
 func (v *VideoMetaData) Width() int {
@@ -41,9 +56,7 @@ func (v *VideoMetaData) Height() int {
 }
 
 type AudioMetaData struct {
-	mediaType utils.AVMediaType
-	codecId   utils.AVCodecID
-
+	metaDataImpl
 	sampleRate   int
 	sampleBit    int
 	channelCount int
@@ -78,22 +91,5 @@ func (a *AudioMetaData) ChannelCount() int {
 }
 
 type SubTitleMetaData struct {
-	mediaType utils.AVMediaType
-	codecId   utils.AVCodecID
-}
-
-func (s *SubTitleMetaData) MediaType() utils.AVMediaType {
-	return s.mediaType
-}
-
-func (s *SubTitleMetaData) CodeId() utils.AVCodecID {
-	return s.codecId
-}
-
-func (s *SubTitleMetaData) setMediaType(mediaType utils.AVMediaType) {
-	s.mediaType = mediaType
-}
-
-func (s *SubTitleMetaData) setCodeId(id utils.AVCodecID) {
-	s.codecId = id
+	metaDataImpl
 }

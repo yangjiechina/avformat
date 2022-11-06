@@ -161,6 +161,7 @@ func (d *DeMuxer) Read() error {
 	if _, err := d.reader.read(d.sampleBuffer[:entry.size]); err != nil {
 		return err
 	}
+	d.handler(d.sampleBuffer[:entry.size], entry.timestamp, entry.timestamp, nextTrack.metaData.MediaType(), nextTrack.metaData.CodeId())
 	nextTrack.currentSample++
 	return nil
 }

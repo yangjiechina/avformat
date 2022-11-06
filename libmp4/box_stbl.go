@@ -1,6 +1,7 @@
 package libmp4
 
 import (
+	"avformat/libavc"
 	"avformat/utils"
 	"fmt"
 )
@@ -292,8 +293,12 @@ type sampleGroupDescriptionBox struct {
 type sampleEntry struct {
 }
 
+func parseExtra() {
+
+}
+
 func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
-	offset := buffer.GetReadOffset()
+	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
 	//revision level
@@ -322,13 +327,25 @@ func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	//pre defined -1
 	buffer.ReadInt16()
 
-	consume := buffer.GetReadOffset() - offset
+	bytes := buffer.ReadableBytes()
+	if bytes > 8 {
+		//parse extra
+		extraSize := buffer.ReadUInt32() - 8
+		buffer.Skip(4)
+		if int(extraSize) <= bytes-8 {
+			extra := make([]byte, bytes-8)
+			buffer.ReadBytes(extra)
+			spspps := libavc.ExtraDataToAnnexB(extra)
+			t.metaData.setExtraData(spspps)
+		}
+	}
 
+	consume := buffer.ReadOffset() - offset
 	buffer.Skip(int(size) - 16 - consume)
 }
 
 func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) {
-	offset := buffer.GetReadOffset()
+	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
 	//revision level
@@ -346,7 +363,7 @@ func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	println(preDefined)
 	println(sampleRate)
 
-	consume := buffer.GetReadOffset() - offset
+	consume := buffer.ReadOffset() - offset
 	buffer.Skip(int(size) - 16 - consume)
 }
 

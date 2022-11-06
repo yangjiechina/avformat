@@ -1,7 +1,6 @@
 package libmp4
 
 import (
-	"bufio"
 	"os"
 )
 
@@ -9,7 +8,6 @@ type fileReader struct {
 	path   string
 	offset int64
 	handle *os.File
-	reader *bufio.Reader
 }
 
 func (f *fileReader) open(path string) error {
@@ -18,7 +16,6 @@ func (f *fileReader) open(path string) error {
 		return err
 	}
 	f.handle = openFile
-	f.reader = bufio.NewReader(f.handle)
 	return nil
 }
 
@@ -36,7 +33,7 @@ func (f *fileReader) seek(offset int64) error {
 }
 
 func (f *fileReader) read(dst []byte) (int64, error) {
-	n, err := f.reader.Read(dst)
+	n, err := f.handle.Read(dst)
 	f.offset += int64(n)
 	return int64(n), err
 }
