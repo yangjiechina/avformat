@@ -66,5 +66,6 @@ func init() {
 		"subs": parseSubSampleInformationBox,
 		"saiz": parseSampleAuxiliaryInformationSizesBox,
 		"saio": parseSampleAuxiliaryInformationOffsetsBox,
+		"esds": parseESDBox,
 	}
 }

@@ -170,14 +170,15 @@ func (d *DeMuxer) TrackCount() int {
 	return len(d.ctx.tracks)
 }
 
-func (d *DeMuxer) FindTrack(mediaType utils.AVMediaType) *Track {
+func (d *DeMuxer) FindTrack(mediaType utils.AVMediaType) []*Track {
+	var tracks []*Track
 	for _, track := range d.ctx.tracks {
 		if track.metaData.MediaType() == mediaType {
-			return track
+			tracks = append(tracks, track)
 		}
 	}
 
-	return nil
+	return tracks
 }
 
 func (d *DeMuxer) Open(path string) error {

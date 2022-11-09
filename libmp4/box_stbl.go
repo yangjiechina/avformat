@@ -290,13 +290,6 @@ type sampleGroupDescriptionBox struct {
 	sampleEntries                 []sampleGroupDescriptionEntry
 }
 
-type sampleEntry struct {
-}
-
-func parseExtra() {
-
-}
-
 func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	offset := buffer.ReadOffset()
 	//version
@@ -344,7 +337,7 @@ func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	buffer.Skip(int(size) - 16 - consume)
 }
 
-func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) int {
 	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -352,19 +345,21 @@ func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) {
 	buffer.ReadUInt16()
 	//vendor
 	_ = buffer.ReadUInt32()
+	//2
 	channelCount := int(buffer.ReadUInt16())
+	//16
 	sampleSize := int(buffer.ReadUInt16())
-	preDefined := buffer.ReadUInt16()
+	_ = buffer.ReadUInt16()
 	//reserved
 	buffer.ReadUInt16()
 	sampleRate := buffer.ReadUInt32() >> 16
-	println(channelCount)
-	println(sampleSize)
-	println(preDefined)
-	println(sampleRate)
 
+	data := t.metaData.(*AudioMetaData)
+	data.sampleRate = int(sampleRate)
+	data.sampleBit = sampleSize
+	data.channelCount = channelCount
 	consume := buffer.ReadOffset() - offset
-	buffer.Skip(int(size) - 16 - consume)
+	return consume
 }
 
 func parseSTSDSubtitle(t *Track, size uint32, buffer *utils.ByteBuffer) {
@@ -378,6 +373,7 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 	stsd := sampleDescriptionBox{fullBox: fullBox{version: version, flags: flags}}
 	stsd.entryCount = buffer.ReadUInt32()
 
+	ret := len(data)
 	for i := 0; i < int(stsd.entryCount); i++ {
 		size := buffer.ReadUInt32()
 		format := buffer.ReadUInt32()
@@ -404,7 +400,9 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 		case utils.AVMediaTypeAudio:
 			codecId, ok = audioTags[format]
 			if ok {
-				parseSTSDAudio(trak, size, buffer)
+				offset := buffer.ReadOffset()
+				consume := parseSTSDAudio(trak, size, buffer)
+				ret = offset + consume
 			}
 			break
 		case utils.AVMediaTypeSubtitle:
@@ -424,7 +422,7 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 
 	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleDescription
 	ctx.tracks[len(ctx.tracks)-1].stsd = &stsd
-	return &stsd, len(data), nil
+	return &stsd, ret, nil
 }
 
 func parseDecodingTimeToSampleBox(ctx *deMuxContext, data []byte) (box, int, error) {

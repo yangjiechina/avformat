@@ -27,10 +27,14 @@ func TestMp4DeMuxer(t *testing.T) {
 
 	convertBuffer := utils.NewByteBuffer()
 	var videoTrack *Track
+	var audioTrack *Track
+	var config *utils.MPEG4AudioConfig
+	header := make([]byte, 7)
+
 	muxer := NewDeMuxer(func(data []byte, pts, dts int64, mediaType utils.AVMediaType, id utils.AVCodecID) {
 		switch id {
 		case utils.AVCodecIdH264:
-			libavc.Mp4ToAnnexB(convertBuffer, data, videoTrack.MetaData().extraData())
+			libavc.Mp4ToAnnexB(convertBuffer, data, videoTrack.MetaData().ExtraData())
 			convertBuffer.ReadTo(func(bytes []byte) {
 				h264File.Write(bytes)
 			})
@@ -38,6 +42,8 @@ func TestMp4DeMuxer(t *testing.T) {
 		case utils.AVCodecIdH265:
 			break
 		case utils.AVCodecIdAAC:
+			utils.SetADtsHeader(header, 0, config.ObjectType-1, config.SamplingIndex, config.ChanConfig, 7+(len(data)))
+			aacFile.Write(header)
 			aacFile.Write(data)
 			break
 		}
@@ -49,9 +55,21 @@ func TestMp4DeMuxer(t *testing.T) {
 		panic(err)
 	}
 
-	videoTrack = muxer.FindTrack(utils.AVMediaTypeVideo)
-	if videoTrack == nil {
+	if tracks := muxer.FindTrack(utils.AVMediaTypeVideo); tracks == nil {
 		panic("Not find for video track.")
+	} else {
+		videoTrack = tracks[0]
+	}
+
+	if tracks := muxer.FindTrack(utils.AVMediaTypeAudio); tracks != nil {
+		audioTrack = tracks[0]
+		metaData := audioTrack.MetaData()
+		if audioTrack != nil && metaData.CodeId() == utils.AVCodecIdAAC {
+			config, err = utils.GetMpeg4AudioConfig(metaData.ExtraData())
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	for err = muxer.Read(); err == nil; err = muxer.Read() {

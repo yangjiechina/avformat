@@ -5,7 +5,7 @@ import "avformat/utils"
 type MetaData interface {
 	MediaType() utils.AVMediaType
 	CodeId() utils.AVCodecID
-	extraData() []byte
+	ExtraData() []byte
 	setMediaType(mediaType utils.AVMediaType)
 	setCodeId(id utils.AVCodecID)
 	setExtraData(data []byte)
@@ -25,7 +25,7 @@ func (m *metaDataImpl) CodeId() utils.AVCodecID {
 	return m.codecId
 }
 
-func (m *metaDataImpl) extraData() []byte {
+func (m *metaDataImpl) ExtraData() []byte {
 	return m.extra
 }
 
