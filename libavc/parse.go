@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	startCode3 = []byte{0x00, 0x00, 0x01}
-	startCode4 = []byte{0x00, 0x00, 0x00, 0x01}
+	StartCode3 = []byte{0x00, 0x00, 0x01}
+	StartCode4 = []byte{0x00, 0x00, 0x00, 0x01}
 )
 
 func FindStartCode(p []byte, offset int) int {
@@ -34,7 +34,7 @@ func FindStartCode(p []byte, offset int) int {
 	}
 }
 
-func FindStartCodeWithBuffer(buffer *utils.ByteBuffer, offset int) int {
+func FindStartCodeFromBuffer(buffer *utils.ByteBuffer, offset int) int {
 	length := buffer.Size()
 	i := offset + 2
 
@@ -83,10 +83,10 @@ func IsKeyFrame(p []byte) bool {
 	}
 }
 
-func IsKeyFrameWithBuffer(buffer *utils.ByteBuffer) bool {
+func IsKeyFrameFromBuffer(buffer *utils.ByteBuffer) bool {
 	index := 0
 	for {
-		index = FindStartCodeWithBuffer(buffer, index)
+		index = FindStartCodeFromBuffer(buffer, index)
 		if index < 0 {
 			return false
 		}
@@ -160,9 +160,9 @@ func copyNalU(buffer *utils.ByteBuffer, data []byte, outSize int, append bool) i
 		}
 
 		if startCodeSize == 4 {
-			buffer.Write(startCode4)
+			buffer.Write(StartCode4)
 		} else if startCodeSize != 0 {
-			buffer.Write(startCode3)
+			buffer.Write(StartCode3)
 		}
 	}
 
@@ -189,7 +189,7 @@ func ExtraDataToAnnexB(src []byte) []byte {
 	for unitNb != 0 {
 		unitNb--
 		size := int(buffer.ReadUInt16())
-		dstBuffer.Write(startCode4)
+		dstBuffer.Write(StartCode4)
 		readOffset := buffer.ReadOffset()
 		dstBuffer.Write(src[readOffset : readOffset+size])
 		buffer.Skip(size)

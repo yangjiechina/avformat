@@ -2,6 +2,7 @@ package libmp4
 
 import (
 	"avformat/libavc"
+	"avformat/libhevc"
 	"avformat/utils"
 	"fmt"
 )
@@ -290,7 +291,7 @@ type sampleGroupDescriptionBox struct {
 	sampleEntries                 []sampleGroupDescriptionEntry
 }
 
-func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) error {
 	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -328,13 +329,26 @@ func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) {
 		if int(extraSize) <= bytes-8 {
 			extra := make([]byte, bytes-8)
 			buffer.ReadBytes(extra)
-			spspps := libavc.ExtraDataToAnnexB(extra)
-			t.metaData.setExtraData(spspps)
+			if t.metaData.CodeId() == utils.AVCodecIdH264 {
+				spspps := libavc.ExtraDataToAnnexB(extra)
+				t.metaData.setExtraData(spspps)
+			} else if t.metaData.CodeId() == utils.AVCodecIdHEVC {
+				b, l, err := libhevc.ExtraDataToAnnexB(extra)
+				if err != nil {
+					return err
+				}
+				t.metaData.(*VideoMetaData).SetLengthSize(l)
+				t.metaData.setExtraData(b)
+			} else {
+				t.metaData.setExtraData(extra)
+			}
+
 		}
 	}
 
 	consume := buffer.ReadOffset() - offset
 	buffer.Skip(int(size) - 16 - consume)
+	return nil
 }
 
 func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) int {
@@ -393,12 +407,16 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 		switch trak.MetaData().MediaType() {
 		case utils.AVMediaTypeVideo:
 			codecId, ok = videoTags[format]
+			trak.metaData.setCodeId(codecId)
 			if ok {
-				parseSTSDVideo(trak, size, buffer)
+				if err := parseSTSDVideo(trak, size, buffer); err != nil {
+					return nil, 0, err
+				}
 			}
 			break
 		case utils.AVMediaTypeAudio:
 			codecId, ok = audioTags[format]
+			trak.metaData.setCodeId(codecId)
 			if ok {
 				offset := buffer.ReadOffset()
 				consume := parseSTSDAudio(trak, size, buffer)
@@ -407,6 +425,7 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 			break
 		case utils.AVMediaTypeSubtitle:
 			codecId, ok = subtitleTags[format]
+			trak.metaData.setCodeId(codecId)
 			if ok {
 				parseSTSDSubtitle(trak, size, buffer)
 			}
@@ -417,7 +436,6 @@ func parseSampleDescriptionBox(ctx *deMuxContext, data []byte) (box, int, error)
 			return nil, -1, fmt.Errorf("not find codec id of the %d format in sample entry", format)
 		}
 
-		trak.metaData.setCodeId(codecId)
 	}
 
 	ctx.tracks[len(ctx.tracks)-1].mark |= markSampleDescription

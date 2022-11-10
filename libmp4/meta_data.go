@@ -45,6 +45,8 @@ type VideoMetaData struct {
 	metaDataImpl
 	width  int
 	height int
+
+	lengthSize int
 }
 
 func (v *VideoMetaData) Width() int {
@@ -53,6 +55,14 @@ func (v *VideoMetaData) Width() int {
 
 func (v *VideoMetaData) Height() int {
 	return v.height
+}
+
+func (v *VideoMetaData) SetLengthSize(lengthSize int) {
+	v.lengthSize = lengthSize
+}
+
+func (v *VideoMetaData) LengthSize() int {
+	return v.lengthSize
 }
 
 type AudioMetaData struct {

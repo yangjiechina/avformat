@@ -38,7 +38,7 @@ func (d *DeMuxer) callback() {
 		keyFrame = true
 		break
 	case StreamIdVideo, StreamIdH624:
-		keyFrame = libavc.IsKeyFrameWithBuffer(d.packet.Data())
+		keyFrame = libavc.IsKeyFrameFromBuffer(d.packet.Data())
 		break
 	}
 

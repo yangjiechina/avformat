@@ -2,19 +2,29 @@ package libmp4
 
 import (
 	"avformat/libavc"
+	"avformat/libhevc"
 	"avformat/utils"
 	"os"
 	"testing"
 )
 
 func TestMp4DeMuxer(t *testing.T) {
-	path := "../232937384-1-208_baseline.mp4"
+	//path := "../232937384-1-208_baseline.mp4"
+	path := "../LB1l2iXISzqK1RjSZFjXXblCFXa.mp4"
 	h264File, err := os.OpenFile(path+".h264", os.O_WRONLY|os.O_CREATE, 132)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
 		h264File.Close()
+	}()
+
+	h265File, err := os.OpenFile(path+".h265", os.O_WRONLY|os.O_CREATE, 132)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		h265File.Close()
 	}()
 
 	aacFile, err := os.OpenFile(path+".aac", os.O_WRONLY|os.O_CREATE, 132)
@@ -40,6 +50,10 @@ func TestMp4DeMuxer(t *testing.T) {
 			})
 			break
 		case utils.AVCodecIdH265:
+			libhevc.Mp4ToAnnexB(convertBuffer, data, videoTrack.MetaData().ExtraData(), videoTrack.MetaData().(*VideoMetaData).LengthSize())
+			convertBuffer.ReadTo(func(bytes []byte) {
+				h265File.Write(bytes)
+			})
 			break
 		case utils.AVCodecIdAAC:
 			utils.SetADtsHeader(header, 0, config.ObjectType-1, config.SamplingIndex, config.ChanConfig, 7+(len(data)))
