@@ -2,7 +2,6 @@ package libavc
 
 import (
 	"avformat/utils"
-	"encoding/binary"
 )
 
 var (
@@ -120,35 +119,6 @@ func ParseNalUnits(p []byte) int {
 	}
 }
 
-func Mp4ToAnnexB(buffer *utils.ByteBuffer, data, extra []byte) {
-	length := len(data)
-	outSize, spsSeen, ppsSeen := 0, false, false
-	for index := 4; index < length; index += 4 {
-		size := int(binary.BigEndian.Uint32(data[index-4:]))
-		if size == 0 || length-index < size {
-			break
-		}
-		unitType := data[index] & 0x1F
-		switch unitType {
-		case H264NalSPS:
-			spsSeen = true
-			break
-		case H264NalPPS:
-			ppsSeen = true
-			break
-		case H264NalIDRSlice:
-			if !spsSeen && !ppsSeen {
-				outSize += copyNalU(buffer, extra, outSize, false)
-			}
-			break
-		}
-
-		bytes := data[index : index+size]
-		outSize += copyNalU(buffer, bytes, outSize, true)
-		index += size
-	}
-}
-
 func copyNalU(buffer *utils.ByteBuffer, data []byte, outSize int, append bool) int {
 	var startCodeSize int
 
@@ -169,37 +139,4 @@ func copyNalU(buffer *utils.ByteBuffer, data []byte, outSize int, append bool) i
 	buffer.Write(data)
 
 	return startCodeSize + len(data)
-}
-
-func ExtraDataToAnnexB(src []byte) []byte {
-	buffer := utils.NewByteBuffer(src)
-	//unsigned int(8) configurationVersion = 1;
-	//unsigned int(8) AVCProfileIndication;
-	//unsigned int(8) profile_compatibility;
-	//unsigned int(8) AVCLevelIndication;
-	buffer.Skip(4)
-	_ = buffer.ReadUInt8()&0x3 + 1
-	unitNb := buffer.ReadUInt8() & 0x1f
-	if unitNb == 0 {
-		return nil
-	}
-
-	dstBuffer := utils.NewByteBuffer()
-	spsDone := 0
-	for unitNb != 0 {
-		unitNb--
-		size := int(buffer.ReadUInt16())
-		dstBuffer.Write(StartCode4)
-		readOffset := buffer.ReadOffset()
-		dstBuffer.Write(src[readOffset : readOffset+size])
-		buffer.Skip(size)
-
-		bytes := buffer.ReadableBytes()
-		spsDone++
-		if bytes > 2 && unitNb == 0 && spsDone == 1 {
-			unitNb = buffer.ReadUInt8()
-		}
-	}
-
-	return dstBuffer.ToBytes()
 }

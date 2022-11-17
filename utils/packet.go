@@ -30,7 +30,7 @@ func (p *Packet) Write(data []byte) {
 	p.data.Write(data)
 }
 func (p *Packet) Release() {
-	p.data.Release()
+	p.data.Clear()
 	p.pts = -1
 	p.dts = -1
 }

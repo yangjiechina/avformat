@@ -33,7 +33,7 @@ func (d *DeMuxer) recursive(ctx *deMuxContext, parent box, data []byte) (bool, e
 		fmt.Printf("size:%d name:%s\r\n", size, name)
 
 		if parse, ok := parsers[name]; !ok {
-			return false, fmt.Errorf("unKnow box type:%s", name)
+			return false, fmt.Errorf("unknow box type:%s", name)
 		} else {
 			b, consume, err := parse(ctx, data[r.offset-n:r.offset])
 			if err != nil {

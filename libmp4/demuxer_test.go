@@ -62,7 +62,7 @@ func TestMp4DeMuxer(t *testing.T) {
 			break
 		}
 
-		convertBuffer.Release()
+		convertBuffer.Clear()
 	})
 
 	if err := muxer.Open(path); err != nil {
@@ -79,7 +79,7 @@ func TestMp4DeMuxer(t *testing.T) {
 		audioTrack = tracks[0]
 		metaData := audioTrack.MetaData()
 		if audioTrack != nil && metaData.CodeId() == utils.AVCodecIdAAC {
-			config, err = utils.GetMpeg4AudioConfig(metaData.ExtraData())
+			config, err = utils.ParseMpeg4AudioConfig(metaData.ExtraData())
 			if err != nil {
 				panic(err)
 			}

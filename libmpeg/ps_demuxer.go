@@ -83,7 +83,7 @@ func (d *DeMuxer) Input(data []byte) int {
 
 			element, ok := d.programStreamMap.findElementaryStream(data[i+3])
 			if !ok {
-				println(fmt.Sprintf("unKnow stream:%x", data[i+3]))
+				println(fmt.Sprintf("unknow stream:%x", data[i+3]))
 				break
 			}
 

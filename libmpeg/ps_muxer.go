@@ -42,7 +42,7 @@ func NewMuxer(handler encodeHandler) *Muxer {
 func (r *Muxer) AddStream(streamType int) (int, error) {
 	streamId, ok := streamTypes[streamType]
 	if !ok {
-		return -1, fmt.Errorf("unKnow stream type %d", streamType)
+		return -1, fmt.Errorf("unknow stream type %d", streamType)
 	}
 
 	for _, s := range r.streams {

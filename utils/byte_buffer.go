@@ -26,7 +26,7 @@ func (b *ByteBuffer) Size() int {
 	return b.size
 }
 
-func (b *ByteBuffer) Release() {
+func (b *ByteBuffer) Clear() {
 	b.data = nil
 	b.size = 0
 	b.itemSize = nil
@@ -34,18 +34,15 @@ func (b *ByteBuffer) Release() {
 }
 
 func (b *ByteBuffer) ToBytes() []byte {
-	if b.data == nil {
-		return nil
-	}
 
-	dst := make([]byte, b.size)
+	dst := make([]byte, b.size-b.readOffset)
 	offset := 0
-	for _, bytes := range b.data {
+	b.PeekTo(func(bytes []byte) {
 		copy(dst[offset:], bytes)
 		offset += len(bytes)
-	}
+		b.readOffset = offset
+	})
 
-	b.Release()
 	return dst
 }
 
@@ -62,7 +59,7 @@ func (b *ByteBuffer) PeekTo(handle func([]byte)) {
 
 func (b *ByteBuffer) ReadTo(handle func([]byte)) {
 	b.PeekTo(handle)
-	b.Release()
+	b.readOffset = b.size
 }
 
 //返回readOffset在二维切片的索引
@@ -237,4 +234,16 @@ func (b *ByteBuffer) ReadBytes(dst []byte) {
 		index += size
 		b.readOffset += size
 	}
+}
+
+// ReadBytesWithShallowCopy can only be used when the data length is 1.
+func (b *ByteBuffer) ReadBytesWithShallowCopy(count int) []byte {
+	end := b.readOffset + count
+	bytes := b.data[0][b.readOffset:end]
+	b.readOffset = end
+	return bytes
+}
+
+func (b *ByteBuffer) PeekBytesWithShallowCopy(count int) []byte {
+	return b.data[0][b.readOffset : b.readOffset+count]
 }

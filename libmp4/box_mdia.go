@@ -147,7 +147,7 @@ func parseMediaInformationBox(ctx *deMuxContext, data []byte) (box, int, error) 
 	case mediaHandlerTypeNull:
 		return nil, -1, fmt.Errorf("not processed for %s box", name)
 	default:
-		return nil, -1, fmt.Errorf("unKnow box:%s", name)
+		return nil, -1, fmt.Errorf("unknow box:%s", name)
 	}
 
 	ctx.tracks[len(ctx.tracks)-1].metaData = metaData

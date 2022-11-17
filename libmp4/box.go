@@ -1,7 +1,7 @@
 package libmp4
 
 //MP4 file format versions
-//Version	Release date	Standard	Description
+//Version	Clear date	Standard	Description
 //MP4 file format version 1	2001	ISO/IEC 14496-1:2001	MPEG-4 Part 1 (Systems), First edition
 //MP4 file format version 2	2003	ISO/IEC 14496-14:2003	MPEG-4 Part 14 (MP4 file format), Second edition
 

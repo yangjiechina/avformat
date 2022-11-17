@@ -146,7 +146,7 @@ func SetADtsHeader(header []byte, mpegId, aot, index, channelConfig, size int) {
 	header[6] = 0xFC // the last 2 bytes of byte belong to number_of_raw_data_blocks_in_frame
 }
 
-func GetMpeg4AudioConfig(data []byte) (*MPEG4AudioConfig, error) {
+func ParseMpeg4AudioConfig(data []byte) (*MPEG4AudioConfig, error) {
 	//audio specific config
 	config := &MPEG4AudioConfig{}
 	config.ObjectType = int(data[0] >> 3)
