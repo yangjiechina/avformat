@@ -291,7 +291,7 @@ type sampleGroupDescriptionBox struct {
 	sampleEntries                 []sampleGroupDescriptionEntry
 }
 
-func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) error {
+func parseSTSDVideo(t *Track, size uint32, buffer utils.ByteBuffer) error {
 	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -351,7 +351,7 @@ func parseSTSDVideo(t *Track, size uint32, buffer *utils.ByteBuffer) error {
 	return nil
 }
 
-func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) int {
+func parseSTSDAudio(t *Track, size uint32, buffer utils.ByteBuffer) int {
 	offset := buffer.ReadOffset()
 	//version
 	buffer.ReadUInt16()
@@ -376,7 +376,7 @@ func parseSTSDAudio(t *Track, size uint32, buffer *utils.ByteBuffer) int {
 	return consume
 }
 
-func parseSTSDSubtitle(t *Track, size uint32, buffer *utils.ByteBuffer) {
+func parseSTSDSubtitle(t *Track, size uint32, buffer utils.ByteBuffer) {
 
 }
 

@@ -8,7 +8,8 @@ import (
 )
 
 func TestDecodePS(t *testing.T) {
-	path := "../1.raw"
+	//path := "../1.raw"
+	path := "D:\\CProjects\\test3\\test7\\yushi.raw.video"
 	fileObj, err := os.OpenFile(path+".h264", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 132)
 	if err != nil {
 		panic(err)
@@ -17,7 +18,7 @@ func TestDecodePS(t *testing.T) {
 		fileObj.Close()
 	}()
 	count := 0
-	deMuxer := NewDeMuxer(func(buffer *utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
+	deMuxer := NewDeMuxer(func(buffer utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
 		fmt.Printf("count:%d  type:%d length:%d keyFrame=%t pts:=%d dts:%d\r\n", count, streamType, buffer.Size(), keyFrame, pts, dts)
 		count++
 		buffer.ReadTo(func(bytes []byte) {

@@ -16,12 +16,6 @@ func WriteDWORD(dst []byte, src uint32) {
 	dst[3] = byte(src)
 }
 
-func WriteInt(dst []byte, value, bytes int) {
-	for i := 0; i < bytes; i++ {
-		dst[i] = byte(value >> ((bytes - i - 1) * 8))
-	}
-}
-
 func BytesToUInt16(b1, b2 byte) uint16 {
 	return uint16(b1)<<8 | uint16(b2)
 }

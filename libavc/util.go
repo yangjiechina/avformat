@@ -23,7 +23,7 @@ type MPEG4AVCConfig struct {
 	SpsExtNALUnit                [][]byte
 }
 
-func Mp4ToAnnexB(buffer *utils.ByteBuffer, data, extra []byte) {
+func Mp4ToAnnexB(buffer utils.ByteBuffer, data, extra []byte) {
 	length := len(data)
 	outSize, spsSeen, ppsSeen := 0, false, false
 	for index := 4; index < length; index += 4 {
@@ -52,23 +52,27 @@ func Mp4ToAnnexB(buffer *utils.ByteBuffer, data, extra []byte) {
 	}
 }
 
-func ExtraDataToAnnexB(src []byte) []byte {
+func ExtraDataToAnnexB(src []byte) ([]byte, error) {
 	buffer := utils.NewByteBuffer(src)
 	//unsigned int(8) configurationVersion = 1;
 	//unsigned int(8) AVCProfileIndication;
 	//unsigned int(8) profile_compatibility;
 	//unsigned int(8) AVCLevelIndication;
+	if err := buffer.PeekCount(6); err != nil {
+		return nil, err
+	}
+
 	buffer.Skip(4)
 	_ = buffer.ReadUInt8()&0x3 + 1
 	unitNb := buffer.ReadUInt8() & 0x1f
-	if unitNb == 0 {
-		return nil
-	}
-
 	dstBuffer := utils.NewByteBuffer()
 	spsDone := 0
 	for unitNb != 0 {
 		unitNb--
+
+		if err := buffer.PeekCount(2); err != nil {
+			return nil, err
+		}
 		size := int(buffer.ReadUInt16())
 		dstBuffer.Write(StartCode4)
 		readOffset := buffer.ReadOffset()
@@ -78,11 +82,14 @@ func ExtraDataToAnnexB(src []byte) []byte {
 		bytes := buffer.ReadableBytes()
 		spsDone++
 		if bytes > 2 && unitNb == 0 && spsDone == 1 {
+			if err := buffer.PeekCount(1); err != nil {
+				return nil, err
+			}
 			unitNb = buffer.ReadUInt8()
 		}
 	}
 
-	return dstBuffer.ToBytes()
+	return dstBuffer.ToBytes(), nil
 }
 
 /*aligned(8) class AVCDecoderConfigurationRecord {

@@ -59,12 +59,12 @@ type esdBox struct {
 	finalBox
 }
 
-func readDesc(buffer *utils.ByteBuffer) (int, int) {
+func readDesc(buffer utils.ByteBuffer) (int, int) {
 	tag := buffer.ReadUInt8()
 	return int(tag), readDescLen(buffer)
 }
 
-func readDescLen(buffer *utils.ByteBuffer) int {
+func readDescLen(buffer utils.ByteBuffer) int {
 	length, count := 0, 4
 	for ; count > 0; count-- {
 		c := buffer.ReadUInt8()
@@ -77,7 +77,7 @@ func readDescLen(buffer *utils.ByteBuffer) int {
 	return length
 }
 
-func parseESDesc(buffer *utils.ByteBuffer, esId int) {
+func parseESDesc(buffer utils.ByteBuffer, esId int) {
 	var flags int
 	if esId != 0 {
 		esId = int(buffer.ReadUInt16())
@@ -100,7 +100,7 @@ func parseESDesc(buffer *utils.ByteBuffer, esId int) {
 	}
 }
 
-func readDecConfigDesc(t *Track, buffer *utils.ByteBuffer) {
+func readDecConfigDesc(t *Track, buffer utils.ByteBuffer) {
 	objectTypeId := buffer.ReadUInt8()
 	buffer.ReadUInt8()
 	buffer.ReadUInt24()

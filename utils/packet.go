@@ -1,7 +1,7 @@
 package utils
 
 type Packet struct {
-	data *ByteBuffer
+	data ByteBuffer
 	pts  int64
 	dts  int64
 }
@@ -22,7 +22,7 @@ func (p *Packet) SetDts(dts int64) {
 	p.dts = dts
 }
 
-func (p *Packet) Data() *ByteBuffer {
+func (p *Packet) Data() ByteBuffer {
 	return p.data
 }
 
@@ -37,7 +37,7 @@ func (p *Packet) Release() {
 
 func NewPacket() *Packet {
 	return &Packet{
-		data: &ByteBuffer{},
+		data: NewByteBuffer(),
 		pts:  -1,
 		dts:  -1,
 	}

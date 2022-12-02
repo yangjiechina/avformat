@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-type deHandler func(buffer *utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64)
+type deHandler func(buffer utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64)
 
 type DeMuxer struct {
 	handler          deHandler

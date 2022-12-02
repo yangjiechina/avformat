@@ -33,7 +33,7 @@ func FindStartCode(p []byte, offset int) int {
 	}
 }
 
-func FindStartCodeFromBuffer(buffer *utils.ByteBuffer, offset int) int {
+func FindStartCodeFromBuffer(buffer utils.ByteBuffer, offset int) int {
 	length := buffer.Size()
 	i := offset + 2
 
@@ -82,7 +82,7 @@ func IsKeyFrame(p []byte) bool {
 	}
 }
 
-func IsKeyFrameFromBuffer(buffer *utils.ByteBuffer) bool {
+func IsKeyFrameFromBuffer(buffer utils.ByteBuffer) bool {
 	index := 0
 	for {
 		index = FindStartCodeFromBuffer(buffer, index)
@@ -119,7 +119,7 @@ func ParseNalUnits(p []byte) int {
 	}
 }
 
-func copyNalU(buffer *utils.ByteBuffer, data []byte, outSize int, append bool) int {
+func copyNalU(buffer utils.ByteBuffer, data []byte, outSize int, append bool) int {
 	var startCodeSize int
 
 	if append {

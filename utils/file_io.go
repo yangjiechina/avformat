@@ -1,16 +1,16 @@
-package libmp4
+package utils
 
 import (
 	"os"
 )
 
-type fileReader struct {
+type FileReader struct {
 	path   string
 	offset int64
 	handle *os.File
 }
 
-func (f *fileReader) open(path string) error {
+func (f *FileReader) Open(path string) error {
 	openFile, err := os.OpenFile(path, os.O_RDONLY, 0444)
 	if err != nil {
 		return err
@@ -19,7 +19,7 @@ func (f *fileReader) open(path string) error {
 	return nil
 }
 
-func (f *fileReader) seek(offset int64) error {
+func (f *FileReader) Seek(offset int64) error {
 	if f.offset == offset {
 		return nil
 	}
@@ -32,12 +32,12 @@ func (f *fileReader) seek(offset int64) error {
 	return err
 }
 
-func (f *fileReader) read(dst []byte) (int64, error) {
+func (f *FileReader) Read(dst []byte) (int64, error) {
 	n, err := f.handle.Read(dst)
 	f.offset += int64(n)
 	return int64(n), err
 }
 
-func (f *fileReader) close() error {
+func (f *FileReader) Close() error {
 	return f.handle.Close()
 }

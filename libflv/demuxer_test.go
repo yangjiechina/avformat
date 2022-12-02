@@ -28,11 +28,12 @@ func TestDeMuxer(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
 	defer func() {
 		aacFile.Close()
 	}()
 
-	muxer := NewDeMuxer(func(mediaType utils.AVMediaType, id utils.AVCodecID, data *utils.ByteBuffer, pts, dts int64) {
+	muxer := NewDeMuxer(func(mediaType utils.AVMediaType, id utils.AVCodecID, data utils.ByteBuffer, pts, dts int64) {
 		switch id {
 		case utils.AVCodecIdH264:
 			data.ReadTo(func(bytes []byte) {

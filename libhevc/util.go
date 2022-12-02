@@ -30,7 +30,7 @@ func ExtraDataToAnnexB(src []byte) ([]byte, int, error) {
 	return dstBuffer.ToBytes(), int(lengthSize), nil
 }
 
-func Mp4ToAnnexB(dst *utils.ByteBuffer, data, extra []byte, lengthSize int) error {
+func Mp4ToAnnexB(dst utils.ByteBuffer, data, extra []byte, lengthSize int) error {
 	length, index := len(data), 0
 	gotIRAP := 0
 	extraSize := len(extra)

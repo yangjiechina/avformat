@@ -11,7 +11,7 @@ type deMuxHandler func(data []byte, pts, dts int64, mediaType utils.AVMediaType,
 
 type DeMuxer struct {
 	ctx          *deMuxContext
-	reader       *fileReader
+	reader       *utils.FileReader
 	sampleBuffer []byte
 	handler      deMuxHandler
 }
@@ -154,11 +154,11 @@ func (d *DeMuxer) Read() error {
 		d.sampleBuffer = make([]byte, entry.size)
 	}
 
-	if err := d.reader.seek(entry.pos); err != nil {
+	if err := d.reader.Seek(entry.pos); err != nil {
 		return err
 	}
 
-	if _, err := d.reader.read(d.sampleBuffer[:entry.size]); err != nil {
+	if _, err := d.reader.Read(d.sampleBuffer[:entry.size]); err != nil {
 		return err
 	}
 	d.handler(d.sampleBuffer[:entry.size], entry.timestamp, entry.timestamp, nextTrack.metaData.MediaType(), nextTrack.metaData.CodeId())
@@ -194,8 +194,8 @@ func (d *DeMuxer) Open(path string) error {
 	}
 
 	d.ctx = context
-	d.reader = &fileReader{}
-	_ = d.reader.open(path)
+	d.reader = &utils.FileReader{}
+	_ = d.reader.Open(path)
 	d.sampleBuffer = make([]byte, 1024*1024*2)
 	return buildIndex(context)
 }
