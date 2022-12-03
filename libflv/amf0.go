@@ -66,8 +66,17 @@ func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
 		return ReadAMF0String(buffer)
 	case AMF0DataTypeObject:
 		m := make(map[string]interface{}, 5)
-		if err := DoReadAFM0(buffer, m); err != nil {
-			return nil, err
+
+		for buffer.ReadableBytes() > 4 {
+			key, err := ReadAMF0String(buffer)
+			if err != nil {
+				return nil, err
+			}
+			value, err := ReadAMF0FromBuffer(buffer)
+			if err != nil {
+				return nil, err
+			}
+			m[key] = value
 		}
 		return m, nil
 	case AMF0DataTypeMovieClip, AMF0DataTypeNull, AMF0DataTypeUnDefined, AMF0DataTypeReference:
@@ -78,6 +87,7 @@ func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
 			return nil, err
 		}
 		count := int(buffer.ReadUInt32())
+
 		m := make(map[string]interface{}, count)
 		for i := 0; i < count; i++ {
 			key, err := ReadAMF0String(buffer)
