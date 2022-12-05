@@ -13,6 +13,7 @@ type ChunkStreamID int
 type MessageTypeID int
 type MessageStreamID int
 type UserControlMessageEvent uint16
+type TransactionID int
 
 /*
 ChunkHeader Format
@@ -78,7 +79,10 @@ const (
 	UserControlMessageEventPingRequest      = UserControlMessageEvent(0x06)
 	UserControlMessageEventPingResponse     = UserControlMessageEvent(0x07)
 
-	DefaultChunkSize = 128
+	TransactionIDConnect      = TransactionID(1)
+	TransactionIDCreateStream = TransactionID(2)
+	TransactionIDPlay         = TransactionID(0)
+	DefaultChunkSize          = 128
 )
 
 type ChunkHeader struct {

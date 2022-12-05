@@ -35,6 +35,7 @@ type Puller struct {
 	host           string
 	port           int
 	app            string
+	streamName     string
 
 	commandBuffer []byte
 	chunkSize     int
@@ -78,7 +79,7 @@ func (p *Puller) onPacket(conn net.Conn, data []byte) {
 		case HandshakeStateDone:
 			//chunks
 			p.processChunk(data[i:])
-			break
+			return
 		}
 	}
 }
@@ -114,7 +115,14 @@ func (p *Puller) parseUrl(addr string) error {
 
 	p.host = parse.Hostname()
 	p.port = port
-	p.app = strings.Split(parse.Path, "/")[1]
+	split := strings.Split(parse.Path, "/")
+	if len(split) > 1 {
+		p.app = strings.Split(parse.Path, "/")[1]
+	}
+	if len(split) > 2 {
+		p.streamName = strings.Split(parse.Path, "/")[2]
+	}
+
 	return nil
 }
 
@@ -177,7 +185,7 @@ func (p *Puller) sendHandshake() error {
 func (p *Puller) connect() {
 	writer := libflv.NewAMF0Writer()
 	writer.AddString("connect")
-	writer.AddNumber(1) //Always set to 1
+	writer.AddNumber(float64(TransactionIDConnect)) //transaction ID. Always set to 1. 对应_result中的number
 	object := libflv.AMF0Object{}
 	object.AddStringProperty("app", p.app)
 	object.AddStringProperty("flashVer", "LNX 9,0,124,2")
@@ -214,10 +222,77 @@ func (p *Puller) connect() {
 }
 
 func (p *Puller) sendWindowAcknowledgementSize() {
+	header := ChunkHeader{
+		chunkType:       ChunkType0,
+		chunkStreamId:   ChunkStreamIdNetwork,
+		timestamp:       0,
+		MessageLength:   4,
+		messageTypeId:   MessageTypeIDWindowAcknowledgementSize,
+		messageStreamId: 0,
+	}
+	bytes := header.ToBytes(p.commandBuffer)
+	binary.BigEndian.PutUint32(p.commandBuffer[bytes:], uint32(p.bandwidth))
+	_, _ = p.client.Write(p.commandBuffer[:4+bytes])
+}
 
+func (p *Puller) createStream() {
+	writer := libflv.NewAMF0Writer()
+	writer.AddString("createStream")
+	writer.AddNumber(float64(TransactionIDCreateStream)) //transaction ID. Always set to 1. 对应_result中的number
+	writer.AddNull()                                     //
+	length := writer.ToBytes(p.commandBuffer[12:])
+
+	header := ChunkHeader{
+		chunkType:       ChunkType0,
+		chunkStreamId:   ChunkStreamIdNetwork,
+		timestamp:       0,
+		MessageLength:   length,
+		messageTypeId:   MessageTypeIDCommandAMF0,
+		messageStreamId: 0,
+	}
+
+	header.ToBytes(p.commandBuffer)
+	length += 12
+	_, _ = p.client.Write(p.commandBuffer[:length])
+}
+
+func (p *Puller) play(streamId float64) {
+	writer := libflv.NewAMF0Writer()
+	writer.AddString("play")
+	writer.AddNumber(float64(TransactionIDPlay)) //transaction ID. Always set to 1. 对应_result中的number
+	writer.AddNull()
+	writer.AddString(p.streamName)
+	//start duration reset
+	writer.AddNumber(-2)    //default
+	writer.AddNumber(-1)    //default
+	writer.AddBoolean(true) //flush any previous playlist
+	length := writer.ToBytes(p.commandBuffer[12:])
+
+	chunk := ChunkHeader{
+		chunkType:       ChunkType0,
+		chunkStreamId:   ChunkStreamIdSystem,
+		timestamp:       0,
+		MessageLength:   length,
+		messageTypeId:   MessageTypeIDCommandAMF0,
+		messageStreamId: int(streamId),
+	}
+
+	chunk.ToBytes(p.commandBuffer)
+	total := 12 + utils.MinInt(length, p.chunkSize)
+	for i := length - p.chunkSize; i > 0; {
+		minInt := utils.MinInt(i, p.chunkSize)
+		chunk.chunkType = ChunkType3
+		copy(p.commandBuffer[total+1:], p.commandBuffer[total:])
+		chunk.ToBytes(p.commandBuffer[total:])
+		i -= minInt
+		total++
+		total += minInt
+	}
+	_, _ = p.client.Write(p.commandBuffer[:total])
 }
 
 func (p *Puller) processChunk(data []byte) error {
+	//fmt.Printf("chunk data:%s\r\n", hex.EncodeToString(data))
 	length, i := len(data), 0
 	header := &ChunkHeader{}
 	for i < length {
@@ -257,6 +332,7 @@ func (p *Puller) processChunk(data []byte) error {
 			p.bandwidth = int(binary.BigEndian.Uint32(data[i:]))
 			//limit type 0-hard/1-soft/2-dynamic
 			_ = data[i+4]
+			p.sendWindowAcknowledgementSize()
 			break
 		case MessageTypeIDAudio:
 			break
@@ -267,8 +343,23 @@ func (p *Puller) processChunk(data []byte) error {
 		case MessageTypeIDDataAMF3:
 			break
 		case MessageTypeIDCommandAMF0:
-			if _, err := libflv.DoReadAFM0(data[i:]); err != nil {
+			if amf0, err := libflv.DoReadAFM0(data[i:]); err != nil {
 				return err
+			} else {
+				l := len(amf0)
+				var command string
+				if l == 0 {
+					return fmt.Errorf("invalid data")
+				}
+				command, _ = amf0[0].(string)
+				if "_result" == command {
+					transactionId := amf0[1].(float64)
+					if TransactionIDCreateStream == TransactionID(transactionId) {
+						streamId := amf0[3].(float64)
+						p.play(streamId)
+					}
+				}
+
 			}
 			break
 		case MessageTypeIDCommandAMF3:
@@ -291,6 +382,7 @@ func (p *Puller) processChunk(data []byte) error {
 func (p *Puller) processUserControlMessage(event UserControlMessageEvent, value uint32) {
 	switch event {
 	case UserControlMessageEventStreamBegin:
+		p.createStream()
 		break
 	case UserControlMessageEventStreamEOF:
 		break
