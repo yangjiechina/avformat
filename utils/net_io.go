@@ -53,7 +53,7 @@ func (c *TCPClient) doRead() {
 	ctx, c.cancel = context.WithCancel(context.Background())
 
 	bytes := make([]byte, 16000)
-	for ctx.Err() != nil {
+	for ctx.Err() == nil {
 		n, err = c.conn.Read(bytes)
 		if err != nil {
 			break

@@ -208,8 +208,8 @@ func (d *AMF3Reader) DoReadAMF3(buffer utils.ByteBuffer, dst map[string]interfac
 		return err
 	}
 
-	for buffer.ReadableBytes() > 4 {
-		value, err := ReadAMF0FromBuffer(buffer)
+	for buffer.ReadableBytes() > 3 {
+		value, err := ReadAMF0(buffer)
 		if err != nil {
 			return err
 		}

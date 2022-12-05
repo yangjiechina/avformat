@@ -43,11 +43,11 @@ type DeMuxer struct {
 	audiocodecid: DOUBLE
 	filesize: DOUBLE
 	*/
-	onMetaData map[string]interface{}
+	metaData []interface{}
 }
 
 func NewDeMuxer(handler Handler) *DeMuxer {
-	return &DeMuxer{onMetaData: make(map[string]interface{}, 10), handler: handler}
+	return &DeMuxer{handler: handler}
 }
 
 func (d *DeMuxer) readAudioTag(data []byte, dst utils.ByteBuffer) (utils.AVCodecID, error) {
@@ -110,16 +110,19 @@ func (d *DeMuxer) readScriptDataObject(data []byte) error {
 	if err := buffer.PeekCount(1); err != nil {
 		return err
 	}
-	if dataType(buffer.ReadUInt8()) != AMF0DataTypeString {
-		return fmt.Errorf("invalid data")
-	}
-	if err := DoReadAFM0(buffer, d.onMetaData); err != nil {
+
+	metaData, err := DoReadAFM0FromBuffer(buffer)
+	if err != nil {
 		return err
 	}
-
-	if _, ok := d.onMetaData["onMetaData"]; !ok {
+	if len(metaData) <= 0 {
+		return fmt.Errorf("invalid data")
+	}
+	if s, ok := metaData[0].(string); s == "" || !ok {
 		return fmt.Errorf("not find the ONMETADATA of AMF0")
 	}
+
+	d.metaData = metaData
 	return nil
 }
 

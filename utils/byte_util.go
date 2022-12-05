@@ -16,6 +16,22 @@ func WriteDWORD(dst []byte, src uint32) {
 	dst[3] = byte(src)
 }
 
+func WriteUInt24(dst []byte, src uint32) {
+	dst[0] = byte(src >> 16)
+	dst[1] = byte(src >> 8)
+	dst[2] = byte(src)
+}
+
+func BytesToInt(src []byte) int {
+	result := 0
+	for i := 0; i < len(src); i++ {
+		result <<= 8
+		result |= int(src[i])
+	}
+
+	return result
+}
+
 func BytesToUInt16(b1, b2 byte) uint16 {
 	return uint16(b1)<<8 | uint16(b2)
 }

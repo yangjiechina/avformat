@@ -35,17 +35,25 @@ func ReadAMF0String(buffer utils.ByteBuffer) (string, error) {
 	if err := buffer.PeekCount(2); err != nil {
 		return "", err
 	}
-	return string(buffer.ReadBytesWithShallowCopy(int(buffer.ReadUInt16()))), nil
+	count := int(buffer.ReadUInt16())
+	if err := buffer.PeekCount(count); err != nil {
+		return "", err
+	}
+	return string(buffer.ReadBytesWithShallowCopy(count)), nil
 }
 
 func ReadAMF0LongString(buffer utils.ByteBuffer) (string, error) {
 	if err := buffer.PeekCount(4); err != nil {
 		return "", err
 	}
-	return string(buffer.ReadBytesWithShallowCopy(int(buffer.ReadUInt32()))), nil
+	count := int(buffer.ReadUInt32())
+	if err := buffer.PeekCount(count); err != nil {
+		return "", err
+	}
+	return string(buffer.ReadBytesWithShallowCopy(count)), nil
 }
 
-func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
+func ReadAMF0(buffer utils.ByteBuffer) (interface{}, error) {
 	if err := buffer.PeekCount(1); err != nil {
 		return nil, err
 	}
@@ -67,12 +75,16 @@ func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
 	case AMF0DataTypeObject:
 		m := make(map[string]interface{}, 5)
 
-		for buffer.ReadableBytes() > 4 {
+		for buffer.ReadableBytes() > 3 {
+			if buffer.PeekUInt24() == uint32(AMF0DataTyeObjectEnd) {
+				buffer.Skip(3)
+				return m, nil
+			}
 			key, err := ReadAMF0String(buffer)
 			if err != nil {
 				return nil, err
 			}
-			value, err := ReadAMF0FromBuffer(buffer)
+			value, err := ReadAMF0(buffer)
 			if err != nil {
 				return nil, err
 			}
@@ -87,14 +99,17 @@ func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
 			return nil, err
 		}
 		count := int(buffer.ReadUInt32())
-
 		m := make(map[string]interface{}, count)
-		for i := 0; i < count; i++ {
+		for buffer.ReadableBytes() > 3 {
+			if int24 := buffer.PeekUInt24(); int24 == uint32(AMF0DataTyeObjectEnd) {
+				buffer.Skip(3)
+				return m, nil
+			}
 			key, err := ReadAMF0String(buffer)
 			if err != nil {
 				return nil, err
 			}
-			value, err := ReadAMF0FromBuffer(buffer)
+			value, err := ReadAMF0(buffer)
 			if err != nil {
 				return nil, err
 			}
@@ -135,20 +150,25 @@ func ReadAMF0FromBuffer(buffer utils.ByteBuffer) (interface{}, error) {
 	return nil, nil
 }
 
-func DoReadAFM0(buffer utils.ByteBuffer, dst map[string]interface{}) error {
-	//Both object keys and strings are preceded by two bytes denoting their length in number of bytes.
-	key, err := ReadAMF0String(buffer)
-	if err != nil {
-		return err
-	}
+func DoReadAFM0FromBuffer(buffer utils.ByteBuffer) ([]interface{}, error) {
 
-	for buffer.ReadableBytes() > 4 {
-		value, err := ReadAMF0FromBuffer(buffer)
-		if err != nil {
-			return err
+	var result []interface{}
+	for buffer.ReadableBytes() > 3 {
+		if int24 := buffer.PeekUInt24(); int24 == uint32(AMF0DataTyeObjectEnd) {
+			buffer.Skip(3)
+			return result, nil
 		}
-		dst[key] = value
+
+		value, err := ReadAMF0(buffer)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, value)
 	}
 
-	return err
+	return result, nil
+}
+
+func DoReadAFM0(data []byte) ([]interface{}, error) {
+	return DoReadAFM0FromBuffer(utils.NewByteBuffer(data))
 }
