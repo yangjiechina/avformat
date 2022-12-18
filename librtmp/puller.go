@@ -14,6 +14,7 @@ import (
 )
 
 type HandshakeState byte
+type ParserState byte
 
 const (
 	HandshakeStateUninitialized = HandshakeState(0) //after the client sends C0
@@ -21,11 +22,50 @@ const (
 	HandshakeStateAckSent       = HandshakeState(2) //client waiting for S2
 	HandshakeStateDone          = HandshakeState(3) //client receives S2
 
+	ParserStateInit              = ParserState(0)
+	ParserStateBasicHeader       = ParserState(1)
+	ParserStateTimestamp         = ParserState(2)
+	ParserStateMessageLength     = ParserState(3)
+	ParserStateStreamType        = ParserState(4)
+	ParserStateStreamId          = ParserState(5)
+	ParserStateExtendedTimestamp = ParserState(6)
+	ParserStatePayload           = ParserState(7)
+)
+
+var (
+	headerSize map[ChunkType]int
 )
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
+
+	headerSize = map[ChunkType]int{
+		ChunkType0: 11,
+		ChunkType1: 7,
+		ChunkType2: 3,
+		ChunkType3: 0,
+	}
 }
+
+type Message struct {
+	ChunkHeader
+	payload []byte
+	length  int
+}
+
+type Parser struct {
+	state             ParserState
+	chunkType         ChunkType
+	chunkStreamId     ChunkStreamID
+	chunkStreamIdSize int
+	headerSize        int
+	offset            int
+	extendedTimestamp bool
+	msg               *Message
+}
+
+type OnVideo func(data []byte, ts int)
+type OnAudio func(data []byte, ts int)
 
 type Puller struct {
 	client         *utils.TCPClient
@@ -41,8 +81,26 @@ type Puller struct {
 	chunkSize     int
 	windowSize    int
 	bandwidth     int
+
+	messages []*Message
+	parser   *Parser
+	onVideo  OnVideo
+	onAudio  OnAudio
 }
 
+func NewPuller(v OnVideo, a OnAudio) *Puller {
+	return &Puller{commandBuffer: make([]byte, 1024*4), parser: &Parser{}, onVideo: v, onAudio: a, chunkSize: DefaultChunkSize}
+}
+
+func (p *Puller) findMessage(csid ChunkStreamID) *Message {
+	for _, message := range p.messages {
+		if message.chunkStreamId == csid {
+			return message
+		}
+	}
+
+	return nil
+}
 func (p *Puller) onPacket(conn net.Conn, data []byte) {
 	length, i := len(data), 0
 	for i < length {
@@ -78,7 +136,7 @@ func (p *Puller) onPacket(conn net.Conn, data []byte) {
 			return
 		case HandshakeStateDone:
 			//chunks
-			p.processChunk(data[i:])
+			_ = p.processChunk(data)
 			return
 		}
 	}
@@ -183,6 +241,7 @@ func (p *Puller) sendHandshake() error {
 */
 
 func (p *Puller) connect() {
+	//command message {name,transactionID,object}
 	writer := libflv.NewAMF0Writer()
 	writer.AddString("connect")
 	writer.AddNumber(float64(TransactionIDConnect)) //transaction ID. Always set to 1. 对应_result中的number
@@ -196,7 +255,9 @@ func (p *Puller) connect() {
 	object.AddNumberProperty("videoCodecs", 0x00FF)   //client supports. 0x00FF supports all video codes
 	object.AddNumberProperty("videoFunction", 0x0001) //Indicates what special video  functions are supported. 0x0001 unused.
 	writer.AddObject(&object)
-	length := writer.ToBytes(p.commandBuffer[12:])
+
+	bytes := make([]byte, 256)
+	length := writer.ToBytes(bytes)
 
 	chunk := ChunkHeader{
 		chunkType:       ChunkType0,
@@ -207,18 +268,7 @@ func (p *Puller) connect() {
 		messageStreamId: 0,
 	}
 
-	chunk.ToBytes(p.commandBuffer)
-	total := 12 + utils.MinInt(length, p.chunkSize)
-	for i := length - p.chunkSize; i > 0; {
-		minInt := utils.MinInt(i, p.chunkSize)
-		chunk.chunkType = ChunkType3
-		copy(p.commandBuffer[total+1:], p.commandBuffer[total:])
-		chunk.ToBytes(p.commandBuffer[total:])
-		i -= minInt
-		total++
-		total += minInt
-	}
-	_, _ = p.client.Write(p.commandBuffer[:total])
+	p.sendMessage(chunk, bytes[:length])
 }
 
 func (p *Puller) sendWindowAcknowledgementSize() {
@@ -230,6 +280,7 @@ func (p *Puller) sendWindowAcknowledgementSize() {
 		messageTypeId:   MessageTypeIDWindowAcknowledgementSize,
 		messageStreamId: 0,
 	}
+
 	bytes := header.ToBytes(p.commandBuffer)
 	binary.BigEndian.PutUint32(p.commandBuffer[bytes:], uint32(p.bandwidth))
 	_, _ = p.client.Write(p.commandBuffer[:4+bytes])
@@ -266,7 +317,9 @@ func (p *Puller) play(streamId float64) {
 	writer.AddNumber(-2)    //default
 	writer.AddNumber(-1)    //default
 	writer.AddBoolean(true) //flush any previous playlist
-	length := writer.ToBytes(p.commandBuffer[12:])
+
+	bytes := make([]byte, 256)
+	length := writer.ToBytes(bytes)
 
 	chunk := ChunkHeader{
 		chunkType:       ChunkType0,
@@ -277,112 +330,180 @@ func (p *Puller) play(streamId float64) {
 		messageStreamId: int(streamId),
 	}
 
-	chunk.ToBytes(p.commandBuffer)
-	total := 12 + utils.MinInt(length, p.chunkSize)
-	for i := length - p.chunkSize; i > 0; {
-		minInt := utils.MinInt(i, p.chunkSize)
-		chunk.chunkType = ChunkType3
-		copy(p.commandBuffer[total+1:], p.commandBuffer[total:])
-		chunk.ToBytes(p.commandBuffer[total:])
-		i -= minInt
-		total++
-		total += minInt
-	}
-	_, _ = p.client.Write(p.commandBuffer[:total])
+	p.sendMessage(chunk, bytes[:length])
 }
 
 func (p *Puller) processChunk(data []byte) error {
-	//fmt.Printf("chunk data:%s\r\n", hex.EncodeToString(data))
 	length, i := len(data), 0
-	header := &ChunkHeader{}
 	for i < length {
-		n, err := readChunkHeader(data[i:], header)
-		if err != nil {
-			return err
-		}
+		switch p.parser.state {
 
-		i += n
-		if header.chunkType != ChunkType3 && length-i < header.MessageLength {
-			return fmt.Errorf("invalid data")
-		}
+		case ParserStateInit:
+			*p.parser = Parser{}
 
-		switch header.messageTypeId {
-		case MessageTypeIDSetChunkSize:
-			p.chunkSize = utils.BytesToInt(data[i : i+header.MessageLength])
-			break
-		case MessageTypeIDAbortMessage:
-			break
-		case MessageTypeIDAcknowledgement:
-			break
-		case MessageTypeIDUserControlMessage:
-			if header.MessageLength < 6 {
-				return fmt.Errorf("invalid data")
+			t := ChunkType(data[i] >> 6)
+			if t > ChunkType3 {
+				return fmt.Errorf("unknow chunk type:%d", t)
 			}
-			event := binary.BigEndian.Uint16(data[i:])
-			value := binary.BigEndian.Uint32(data[i+2:])
-			p.processUserControlMessage(UserControlMessageEvent(event), value)
-			break
-		case MessageTypeIDWindowAcknowledgementSize:
-			p.windowSize = utils.BytesToInt(data[i : i+header.MessageLength])
-			break
-		case MessageTypeIDSetPeerBandWith:
-			if header.MessageLength < 5 {
-				return fmt.Errorf("invalid data")
-			}
-			p.bandwidth = int(binary.BigEndian.Uint32(data[i:]))
-			//limit type 0-hard/1-soft/2-dynamic
-			_ = data[i+4]
-			p.sendWindowAcknowledgementSize()
-			break
-		case MessageTypeIDAudio:
-			break
-		case MessageTypeIDVideo:
-			break
-		case MessageTypeIDDataAMF0:
-			break
-		case MessageTypeIDDataAMF3:
-			break
-		case MessageTypeIDCommandAMF0:
-			if amf0, err := libflv.DoReadAFM0(data[i:]); err != nil {
-				return err
+
+			if data[i]&0x3F == 0 {
+				p.parser.chunkStreamIdSize = 1
+			} else if data[i]&0x3F == 1 {
+				p.parser.chunkStreamIdSize = 2
 			} else {
-				l := len(amf0)
-				var command string
-				if l == 0 {
-					return fmt.Errorf("invalid data")
+				p.parser.chunkStreamIdSize = 0
+				p.parser.chunkStreamId = ChunkStreamID(data[i] & 0x3F)
+			}
+
+			p.parser.chunkType = t
+			p.parser.headerSize = headerSize[p.parser.chunkType]
+			p.parser.state = ParserStateBasicHeader
+			i++
+			break
+
+		case ParserStateBasicHeader:
+			for p.parser.chunkStreamIdSize > 0 {
+				p.parser.chunkStreamId <<= 8
+				p.parser.chunkStreamId |= ChunkStreamID(data[i])
+				p.parser.chunkStreamIdSize--
+				i++
+			}
+
+			if p.parser.chunkStreamIdSize == 0 {
+				message := p.findMessage(p.parser.chunkStreamId)
+				if message == nil {
+					message = &Message{ChunkHeader{chunkType: p.parser.chunkType, chunkStreamId: p.parser.chunkStreamId}, nil, 0}
 				}
-				command, _ = amf0[0].(string)
-				if "_result" == command {
-					transactionId := amf0[1].(float64)
-					if TransactionIDCreateStream == TransactionID(transactionId) {
-						streamId := amf0[3].(float64)
-						p.play(streamId)
+				p.messages = append(p.messages, message)
+				p.parser.msg = message
+
+				if p.parser.chunkType < ChunkType3 {
+					p.parser.state = ParserStateTimestamp
+				} else {
+					p.parser.state = ParserStatePayload
+				}
+			}
+			break
+
+		case ParserStateTimestamp:
+			for p.parser.offset < 3 && i < length {
+				p.parser.msg.timestamp <<= 8
+				p.parser.msg.timestamp |= int(data[i])
+				p.parser.offset++
+				i++
+			}
+
+			if p.parser.offset == 3 {
+				p.parser.extendedTimestamp = p.parser.msg.timestamp == 0xFFFFFF
+				if p.parser.chunkType < ChunkType2 {
+					p.parser.state = ParserStateMessageLength
+				} else if p.parser.extendedTimestamp {
+					p.parser.state = ParserStateExtendedTimestamp
+				} else {
+					p.parser.state = ParserStatePayload
+				}
+			}
+			break
+
+		case ParserStateMessageLength:
+			for p.parser.offset < 6 && i < length {
+				p.parser.msg.MessageLength <<= 8
+				p.parser.msg.MessageLength |= int(data[i])
+				p.parser.offset++
+				i++
+			}
+
+			if p.parser.offset == 6 {
+				p.parser.state = ParserStateStreamType
+			}
+			break
+
+		case ParserStateStreamType:
+			p.parser.msg.messageTypeId = MessageTypeID(data[i])
+			i++
+			p.parser.offset++
+			if p.parser.chunkType == ChunkType0 {
+				p.parser.state = ParserStateStreamId
+			} else if p.parser.extendedTimestamp {
+				p.parser.state = ParserStateExtendedTimestamp
+			} else {
+				p.parser.state = ParserStatePayload
+			}
+			break
+
+		case ParserStateStreamId:
+			for p.parser.offset < 11 && i < length {
+				p.parser.msg.messageStreamId <<= 8
+				p.parser.msg.messageStreamId |= int(data[i])
+				p.parser.offset++
+				i++
+			}
+
+			if p.parser.offset == 11 {
+				if p.parser.extendedTimestamp {
+					p.parser.state = ParserStateExtendedTimestamp
+				} else {
+					p.parser.state = ParserStatePayload
+				}
+			}
+			break
+
+		case ParserStateExtendedTimestamp:
+			for p.parser.offset < 15 && i < length {
+				p.parser.msg.timestamp <<= 8
+				p.parser.msg.timestamp |= int(data[i])
+				p.parser.offset++
+				i++
+			}
+
+			if p.parser.offset == 15 {
+				if p.parser.extendedTimestamp {
+					p.parser.state = ParserStateExtendedTimestamp
+				} else {
+					p.parser.state = ParserStatePayload
+				}
+			}
+			break
+
+		case ParserStatePayload:
+			remain := length - i
+			need := p.parser.msg.MessageLength - p.parser.msg.length
+			consume := utils.MinInt(need, p.chunkSize-(p.parser.msg.length%p.chunkSize))
+			consume = utils.MinInt(consume, remain)
+			if len(p.parser.msg.payload) < p.parser.msg.MessageLength {
+				bytes := make([]byte, p.parser.msg.MessageLength+1024)
+				copy(bytes, p.parser.msg.payload)
+				p.parser.msg.payload = bytes
+			}
+
+			copy(p.parser.msg.payload[p.parser.msg.length:], data[i:i+consume])
+			p.parser.msg.length += consume
+
+			if p.parser.msg.length >= p.parser.msg.MessageLength {
+				if p.parser.msg.length != 0 {
+					err := p.processMessage(p.parser.msg.messageTypeId, p.parser.msg.payload[:p.parser.msg.length], p.parser.msg.timestamp)
+					if err != nil {
+						return err
 					}
 				}
 
+				*p.parser.msg = Message{}
+				p.parser.state = ParserStateInit
+			} else if p.parser.msg.length%p.chunkSize == 0 {
+				p.parser.state = ParserStateInit
 			}
-			break
-		case MessageTypeIDCommandAMF3:
-			break
-		case MessageTypeIDSharedObjectAMF0:
-			break
-		case MessageTypeIDSharedObjectAMF3:
-			break
-		case MessageTypeIDAggregateMessage:
+
+			i += consume
 			break
 		}
-
-		i += header.MessageLength
-
 	}
-	//read chunk
+
 	return nil
 }
 
 func (p *Puller) processUserControlMessage(event UserControlMessageEvent, value uint32) {
 	switch event {
 	case UserControlMessageEventStreamBegin:
-		p.createStream()
 		break
 	case UserControlMessageEventStreamEOF:
 		break
@@ -400,4 +521,90 @@ func (p *Puller) processUserControlMessage(event UserControlMessageEvent, value 
 		fmt.Printf("unkonw control event:%d", event)
 		break
 	}
+}
+
+func (p *Puller) processMessage(typeId MessageTypeID, data []byte, timestamp int) error {
+	switch typeId {
+	case MessageTypeIDSetChunkSize:
+		p.chunkSize = utils.BytesToInt(data)
+		break
+	case MessageTypeIDAbortMessage:
+		break
+	case MessageTypeIDAcknowledgement:
+		break
+	case MessageTypeIDUserControlMessage:
+		event := binary.BigEndian.Uint16(data)
+		value := binary.BigEndian.Uint32(data[2:])
+		p.processUserControlMessage(UserControlMessageEvent(event), value)
+		break
+	case MessageTypeIDWindowAcknowledgementSize:
+		p.windowSize = utils.BytesToInt(data)
+		break
+	case MessageTypeIDSetPeerBandWith:
+		p.bandwidth = int(binary.BigEndian.Uint32(data))
+		//limit type 0-hard/1-soft/2-dynamic
+		_ = data[4:]
+		p.sendWindowAcknowledgementSize()
+		break
+	case MessageTypeIDAudio:
+		p.onAudio(data, timestamp)
+		break
+	case MessageTypeIDVideo:
+		p.onVideo(data, timestamp)
+		break
+	//case MessageTypeIDDataAMF0:
+	//	break
+	case MessageTypeIDDataAMF3:
+		break
+	case MessageTypeIDDataAMF0, MessageTypeIDCommandAMF0, MessageTypeIDSharedObjectAMF0:
+		if amf0, err := libflv.DoReadAFM0(data); err != nil {
+			return err
+		} else {
+			l := len(amf0)
+			var command string
+			if l == 0 {
+				return fmt.Errorf("invalid data")
+			}
+
+			command, _ = amf0[0].(string)
+			if "_result" == command || "_error" == command {
+				transactionId := amf0[1].(float64)
+				if TransactionIDConnect == TransactionID(transactionId) {
+					p.createStream()
+				} else if TransactionIDCreateStream == TransactionID(transactionId) {
+					streamId := amf0[3].(float64)
+					p.play(streamId)
+				}
+			}
+		}
+		break
+	case MessageTypeIDCommandAMF3:
+		break
+	//case MessageTypeIDSharedObjectAMF0:
+	//	break
+	case MessageTypeIDSharedObjectAMF3:
+		break
+	case MessageTypeIDAggregateMessage:
+		//unsupported
+		break
+	}
+
+	return nil
+}
+
+func (p *Puller) sendMessage(header ChunkHeader, payload []byte) {
+	length, index := len(payload), 0
+	for length > 0 {
+		minInt := utils.MinInt(p.chunkSize, length)
+		if length != len(payload) {
+			header.chunkType = ChunkType3
+		}
+
+		index += header.ToBytes(p.commandBuffer[index:])
+		copy(p.commandBuffer[index:], payload[len(payload)-length:len(payload)-length+minInt])
+		length -= minInt
+		index += minInt
+	}
+
+	_, _ = p.client.Write(p.commandBuffer[:index])
 }

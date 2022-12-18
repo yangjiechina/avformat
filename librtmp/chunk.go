@@ -51,26 +51,21 @@ const (
 	ChunkStreamIdVideo   = ChunkStreamID(6)
 	ChunkStreamIdSource  = ChunkStreamID(8)
 
-	MessageTypeIDSetChunkSize              = MessageTypeID(1)
-	MessageTypeIDAbortMessage              = MessageTypeID(2)
-	MessageTypeIDAcknowledgement           = MessageTypeID(3)
-	MessageTypeIDUserControlMessage        = MessageTypeID(4)
-	MessageTypeIDWindowAcknowledgementSize = MessageTypeID(5)
-	MessageTypeIDSetPeerBandWith           = MessageTypeID(6)
-	MessageTypeIDAudio                     = MessageTypeID(8)
-	MessageTypeIDVideo                     = MessageTypeID(9)
-
-	// MessageTypeIDDataAMF0 MessageTypeIDDataAMF3 metadata:creation time, duration, theme...
-	MessageTypeIDDataAMF0 = MessageTypeID(18)
-	MessageTypeIDDataAMF3 = MessageTypeID(15)
-	// MessageTypeIDCommandAMF0 MessageTypeIDCommandAMF3  connect, createStream, publish, play, pause
-	MessageTypeIDCommandAMF0 = MessageTypeID(20)
-	MessageTypeIDCommandAMF3 = MessageTypeID(17)
-
-	MessageTypeIDSharedObjectAMF0 = MessageTypeID(19)
-	MessageTypeIDSharedObjectAMF3 = MessageTypeID(16)
-	MessageTypeIDAggregateMessage = MessageTypeID(22)
-
+	MessageTypeIDSetChunkSize               = MessageTypeID(1)
+	MessageTypeIDAbortMessage               = MessageTypeID(2)
+	MessageTypeIDAcknowledgement            = MessageTypeID(3)
+	MessageTypeIDUserControlMessage         = MessageTypeID(4)
+	MessageTypeIDWindowAcknowledgementSize  = MessageTypeID(5)
+	MessageTypeIDSetPeerBandWith            = MessageTypeID(6)
+	MessageTypeIDAudio                      = MessageTypeID(8)
+	MessageTypeIDVideo                      = MessageTypeID(9)
+	MessageTypeIDDataAMF0                   = MessageTypeID(18) // MessageTypeIDDataAMF0 MessageTypeIDDataAMF3 metadata:creation time, duration, theme...
+	MessageTypeIDDataAMF3                   = MessageTypeID(15)
+	MessageTypeIDCommandAMF0                = MessageTypeID(20) // MessageTypeIDCommandAMF0 MessageTypeIDCommandAMF3  connect, createStream, publish, play, pause
+	MessageTypeIDCommandAMF3                = MessageTypeID(17)
+	MessageTypeIDSharedObjectAMF0           = MessageTypeID(19)
+	MessageTypeIDSharedObjectAMF3           = MessageTypeID(16)
+	MessageTypeIDAggregateMessage           = MessageTypeID(22)
 	UserControlMessageEventStreamBegin      = UserControlMessageEvent(0x00)
 	UserControlMessageEventStreamEOF        = UserControlMessageEvent(0x01)
 	UserControlMessageEventStreamDry        = UserControlMessageEvent(0x02)
@@ -94,11 +89,13 @@ type ChunkHeader struct {
 	MessageLength   int
 	messageTypeId   MessageTypeID
 	messageStreamId int //customized by users. LittleEndian
+
 }
 
 func (h ChunkHeader) ToBytes(dst []byte) int {
 	var index int
 	index++
+
 	dst[0] = byte(h.chunkType) << 6
 	if h.chunkStreamId <= 63 {
 		dst[0] = dst[0] | 0x3
@@ -113,92 +110,86 @@ func (h ChunkHeader) ToBytes(dst []byte) int {
 		index += 2
 	}
 
-	if h.chunkType != ChunkType3 {
-		for i := 0; i < 3; i++ {
-			if i == 0 {
-				if h.timestamp >= 0xFFFFFF {
-					utils.WriteUInt24(dst[index:], 0xFFFFFF)
-					index += 3
-				} else {
-					utils.WriteUInt24(dst[index:], uint32(h.timestamp))
-					index += 3
-				}
-				if h.chunkType == ChunkType2 {
-					break
-				}
-			} else if i == 1 {
-				utils.WriteUInt24(dst[index:], uint32(h.MessageLength))
-				index += 4
-				dst[index-1] = byte(h.messageTypeId)
-				if h.chunkType == ChunkType1 {
-					break
-				}
-			} else {
-				binary.LittleEndian.PutUint32(dst[index:], uint32(h.messageStreamId))
-				index += 4
-			}
-		}
-
+	if h.chunkType < ChunkType3 {
 		if h.timestamp >= 0xFFFFFF {
-			binary.BigEndian.PutUint32(dst[index:], uint32(h.timestamp))
-			index += 4
+			utils.WriteUInt24(dst[index:], 0xFFFFFF)
+		} else {
+			utils.WriteUInt24(dst[index:], uint32(h.timestamp))
 		}
+		index += 3
+	}
+
+	if h.chunkType < ChunkType2 {
+		utils.WriteUInt24(dst[index:], uint32(h.MessageLength))
+		index += 4
+		dst[index-1] = byte(h.messageTypeId)
+	}
+
+	if h.chunkType < ChunkType1 {
+		binary.LittleEndian.PutUint32(dst[index:], uint32(h.messageStreamId))
+		index += 4
+	}
+
+	if h.timestamp >= 0xFFFFFF {
+		binary.BigEndian.PutUint32(dst[index:], uint32(h.timestamp))
+		index += 4
 	}
 
 	return index
 }
 
-func readChunkHeader(src []byte, header *ChunkHeader) (int, error) {
-	var i int
-	header.chunkType = ChunkType(src[0] >> 6)
-	if header.chunkType > 0x3 {
-		return -1, fmt.Errorf("unknow chunk type:%d", header.chunkType)
+func readBasicHeader(src []byte) (ChunkType, ChunkStreamID, int, error) {
+	t := ChunkType(src[0] >> 6)
+	if t > 0x3 {
+		return t, 0, 0, fmt.Errorf("unknow chunk type:%d", t)
 	}
 
-	i++
 	switch src[0] & 0x3F {
 	case 0:
 		//64-(64+255)
-		header.chunkStreamId = ChunkStreamID(64 + int(src[i]))
-		break
+		return t, ChunkStreamID(64 + int(src[1])), 2, nil
 	case 1:
 		//64-(65535+64)
-		header.chunkStreamId = ChunkStreamID(64 + int(binary.BigEndian.Uint16(src[i:])))
-		i += 2
-		break
-	case 2:
+		return t, ChunkStreamID(64 + int(binary.BigEndian.Uint16(src[1:]))), 3, nil
+	//case 2:
 	default:
 		//1bytes
-		header.chunkStreamId = ChunkStreamID(src[0] & 0x3F)
-		break
+		return t, ChunkStreamID(src[0] & 0x3F), 1, nil
+	}
+}
+
+func readChunkHeader(src []byte) (ChunkHeader, int, error) {
+	t, csid, i, err := readBasicHeader(src)
+	if err != nil {
+		return ChunkHeader{}, 0, err
 	}
 
-	if header.chunkType != ChunkType3 {
-		for j := 0; j < 3; j++ {
-			if j == 0 {
-				i += 3
-				header.timestamp = int(utils.BytesToUInt24(src[i-3], src[i-2], src[i-1]))
-				if header.chunkType == ChunkType2 {
-					break
-				}
-			} else if j == 1 {
-				i += 4
-				header.MessageLength = int(utils.BytesToUInt24(src[i-4], src[i-3], src[i-2]))
-				header.messageTypeId = MessageTypeID(src[i-1])
-				if header.chunkType == ChunkType1 {
-					break
-				}
-			} else {
-				binary.LittleEndian.Uint32(src[i:])
-				i += 4
-			}
-		}
-
-		if header.timestamp == 0xFFFFFF {
-			header.timestamp = int(binary.BigEndian.Uint32(src[i:]))
-			i += 4
-		}
+	header := ChunkHeader{
+		chunkType:     t,
+		chunkStreamId: csid,
 	}
 
-	return i, nil
+	if header.chunkType < ChunkType3 {
+		header.timestamp = utils.BytesToInt(src[i : i+3])
+		i += 3
+	}
+
+	if header.chunkType < ChunkType2 {
+		i += 3
+		header.MessageLength = utils.BytesToInt(src[i-3 : i])
+		header.messageTypeId = MessageTypeID(src[i])
+		i++
+	}
+
+	if header.chunkType < ChunkType1 {
+		header.messageStreamId = int(binary.LittleEndian.Uint32(src[i:]))
+		i += 4
+	}
+
+	if header.timestamp == 0xFFFFFF {
+		header.timestamp = int(binary.BigEndian.Uint32(src[i:]))
+		i += 4
+	}
+
+	return header, i, nil
 }
