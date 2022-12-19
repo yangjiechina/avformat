@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"net/url"
+	url2 "net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -147,19 +147,13 @@ func (p *Puller) onDisconnected(conn net.Conn, err error) {
 }
 
 func (p *Puller) parseUrl(addr string) error {
-	if index := strings.Index(addr, ":"); index == -1 {
-		return fmt.Errorf("the format of URL is invalid")
-	} else {
-		protocol := addr[:index]
-		if "rtmp" != protocol {
-			return fmt.Errorf("unknow protocol:%s", protocol)
-		}
-		p.protocol = protocol
-	}
-
-	parse, err := url.Parse(addr)
+	parse, err := url2.Parse(addr)
 	if err != nil {
 		return err
+	}
+
+	if "rtmp" != parse.Scheme {
+		return fmt.Errorf("unknow protocol:%s", parse.Scheme)
 	}
 
 	var port int
@@ -170,9 +164,10 @@ func (p *Puller) parseUrl(addr string) error {
 	} else {
 		port = DefaultPort
 	}
-
+	p.protocol = parse.Scheme
 	p.host = parse.Hostname()
 	p.port = port
+
 	split := strings.Split(parse.Path, "/")
 	if len(split) > 1 {
 		p.app = strings.Split(parse.Path, "/")[1]
