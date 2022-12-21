@@ -12,11 +12,19 @@ type OnDisconnectedHandler func(conn net.Conn, err error)
 type Transport interface {
 	SetOnPacketHandler(OnPacketHandler)
 	SetOnDisconnectedHandler(OnDisconnectedHandler)
+	Conn() net.Conn
+	Write([]byte) (int, error)
+	Close() error
+	Read()
+	ListenPort() int
 }
 
 type transport struct {
 	onPacketHandler       OnPacketHandler
 	onDisConnectedHandler OnDisconnectedHandler
+	conn                  net.Conn
+	cancel                context.CancelFunc
+	listPort              int
 }
 
 func (t *transport) SetOnPacketHandler(handler OnPacketHandler) {
@@ -27,53 +35,75 @@ func (t *transport) SetOnDisconnectedHandler(handler OnDisconnectedHandler) {
 	t.onDisConnectedHandler = handler
 }
 
-type TCPClient struct {
-	transport
-	conn   net.Conn
-	cancel context.CancelFunc
+func (t *transport) Conn() net.Conn {
+	return t.conn
 }
 
-func NewTCPClient(localAddr *net.TCPAddr, serverIp string, serverPort int) (*TCPClient, error) {
-	dialer := net.Dialer{LocalAddr: localAddr}
-	if dial, err := dialer.Dial("tcp", fmt.Sprintf("%s:%d", serverIp, serverPort)); err != nil {
-		return nil, err
-	} else {
-		return &TCPClient{conn: dial}, nil
-	}
+func (t *transport) Write(data []byte) (int, error) {
+	return t.conn.Write(data)
 }
 
-func (c *TCPClient) Write(data []byte) (int, error) {
-	return c.conn.Write(data)
+func (t *transport) Close() error {
+	t.cancel()
+	return t.conn.Close()
 }
 
-func (c *TCPClient) doRead() {
+func (t *transport) doRead() {
 	var err error
 	var n int
 	var ctx context.Context
-	ctx, c.cancel = context.WithCancel(context.Background())
+	ctx, t.cancel = context.WithCancel(context.Background())
 
 	bytes := make([]byte, 16000)
 	for ctx.Err() == nil {
-		n, err = c.conn.Read(bytes)
+		n, err = t.conn.Read(bytes)
 		if err != nil {
 			break
 		}
 
-		if c.onPacketHandler != nil {
-			c.onPacketHandler(c.conn, bytes[:n])
+		if t.onPacketHandler != nil {
+			t.onPacketHandler(t.conn, bytes[:n])
 		}
 	}
 
-	if c.onDisConnectedHandler != nil {
-		c.onDisConnectedHandler(c.conn, err)
+	if t.onDisConnectedHandler != nil {
+		t.onDisConnectedHandler(t.conn, err)
 	}
 }
 
-func (c *TCPClient) Read() {
-	go c.doRead()
+func (t *transport) Read() {
+	go t.doRead()
 }
 
-func (c *TCPClient) Close() error {
-	c.cancel()
-	return c.conn.Close()
+func (t *transport) ListenPort() int {
+	return t.listPort
+}
+
+type TCPClient struct {
+	transport
+}
+
+type UDPTransport struct {
+	transport
+}
+
+func (u *UDPTransport) WriteTo(data []byte, ip string, port int) (int, error) {
+	return u.conn.(*net.UDPConn).WriteTo(data, &net.UDPAddr{IP: net.ParseIP(ip), Port: port})
+}
+
+func NewTCPClient(localAddr *net.TCPAddr, serverIp string, serverPort int) (Transport, error) {
+	dialer := net.Dialer{LocalAddr: localAddr}
+	if dial, err := dialer.Dial("tcp", fmt.Sprintf("%s:%d", serverIp, serverPort)); err != nil {
+		return nil, err
+	} else {
+		return &TCPClient{transport: transport{conn: dial, listPort: dial.LocalAddr().(*net.TCPAddr).Port}}, nil
+	}
+}
+
+func NewUDPTransport(port int) (Transport, error) {
+	udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: port})
+	if err != nil {
+		return nil, err
+	}
+	return &UDPTransport{transport{conn: udp, listPort: port}}, nil
 }

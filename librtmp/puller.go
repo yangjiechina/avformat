@@ -68,7 +68,7 @@ type OnVideo func(data []byte, ts int)
 type OnAudio func(data []byte, ts int)
 
 type Puller struct {
-	client         *utils.TCPClient
+	client         utils.Transport
 	handshakeState HandshakeState
 	protocol       string
 	url            string
