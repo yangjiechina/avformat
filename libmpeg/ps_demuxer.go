@@ -17,34 +17,47 @@ type DeMuxer struct {
 	packetHeader     *PacketHeader
 	systemHeader     *SystemHeader
 	programStreamMap *ProgramStreamMap
-	lastPesPacket    *PESPacket
-	currentPesPacket *PESPacket
+	lastPesHeader    *PESHeader
+	currentPesHeader *PESHeader
 
 	packet     *utils.Packet
 	streamType byte
 }
 
-func (d *DeMuxer) Close() {
-	//回调最后一帧
-	if d.packet.Data().Size() > 0 {
-		d.callback()
-	}
-}
-
-func (d *DeMuxer) callback() {
+func callbackES(streamId, streamType byte, packet *utils.Packet, handler deHandler) {
 	var keyFrame bool
-	switch d.lastPesPacket.streamId {
+	switch streamId {
 	case StreamIdAudio:
 		keyFrame = true
 		break
 	case StreamIdVideo, StreamIdH624:
-		keyFrame = libavc.IsKeyFrameFromBuffer(d.packet.Data())
+		keyFrame = libavc.IsKeyFrameFromBuffer(packet.Data())
 		break
 	}
 
-	d.handler(d.packet.Data(), keyFrame, int(d.streamType), d.packet.Pts(), d.packet.Dts())
-	d.packet.Release()
+	handler(packet.Data(), keyFrame, int(streamType), packet.Pts(), packet.Dts())
 }
+
+func (d *DeMuxer) Close() {
+	//回调最后一帧
+	if d.packet.Data().Size() > 0 {
+		callbackES(d.lastPesHeader.streamId, d.streamType, d.packet, d.handler)
+	}
+}
+
+//func (d *DeMuxer) callback(streamId byte) {
+//	var keyFrame bool
+//	switch streamId {
+//	case StreamIdAudio:
+//		keyFrame = true
+//		break
+//	case StreamIdVideo, StreamIdH624:
+//		keyFrame = libavc.IsKeyFrameFromBuffer(d.packet.Data())
+//		break
+//	}
+//
+//	d.handler(d.packet.Data(), keyFrame, int(d.streamType), d.packet.Pts(), d.packet.Dts())
+//}
 
 // Input Reference from https://github.com/ireader/media-server/blob/master/libmpeg/source/mpeg-ps-dec.c
 func (d *DeMuxer) Input(data []byte) int {
@@ -76,8 +89,8 @@ func (d *DeMuxer) Input(data []byte) int {
 				firstPesIndex = i
 			}
 
-			esPacket, n = readPESPacket(d.currentPesPacket, data[i:])
-			if n == 0 {
+			n = readPESHeader(d.currentPesHeader, data[i:])
+			if n == 0 || len(data[i:])-n > int(d.currentPesHeader.packetLength-3-uint16(d.currentPesHeader.pesHeaderDataLength)) {
 				goto END
 			}
 
@@ -87,26 +100,28 @@ func (d *DeMuxer) Input(data []byte) int {
 				break
 			}
 
-			if d.lastPesPacket == nil {
-				pesPacket := *d.currentPesPacket
-				d.lastPesPacket = &pesPacket
+			if d.lastPesHeader == nil {
+				pesPacket := *d.currentPesHeader
+				d.lastPesHeader = &pesPacket
 			}
 
 			//读到下一包，才回调前一包
 			//上一包和当前包的pts/streamId不一样,才回调
-			if d.currentPesPacket.streamId != d.lastPesPacket.streamId || d.currentPesPacket.pts != d.lastPesPacket.pts {
-				d.callback()
-				*d.lastPesPacket = *d.currentPesPacket
+			if d.currentPesHeader.streamId != d.lastPesHeader.streamId || d.currentPesHeader.pts != d.lastPesHeader.pts {
+				//d.callback(d.lastPesHeader.streamId)
+				callbackES(d.lastPesHeader.streamId, d.streamType, d.packet, d.handler)
+				d.packet.Release()
+				*d.lastPesHeader = *d.currentPesHeader
 				firstPesIndex = i
 			}
 
 			d.streamType = element.streamType
-			if d.currentPesPacket.ptsDtsFlags&0x3 != 0 {
-				d.packet.SetPts(d.currentPesPacket.pts)
-				d.packet.SetDts(d.currentPesPacket.dts)
+			if d.currentPesHeader.ptsDtsFlags&0x3 != 0 {
+				d.packet.SetPts(d.currentPesHeader.pts)
+				d.packet.SetDts(d.currentPesHeader.dts)
 			}
 			d.packet.Write(esPacket)
-			d.currentPesPacket.Reset()
+			d.currentPesHeader.Reset()
 		}
 
 		i += n
@@ -114,6 +129,7 @@ func (d *DeMuxer) Input(data []byte) int {
 	}
 
 END:
+	d.currentPesHeader.Reset()
 	if firstPesIndex != 0 {
 		return firstPesIndex
 	} else {
@@ -168,7 +184,7 @@ func NewDeMuxer(handler deHandler) *DeMuxer {
 		packetHeader:     &PacketHeader{},
 		systemHeader:     &SystemHeader{},
 		programStreamMap: &ProgramStreamMap{},
-		currentPesPacket: NewPESPacket(),
+		currentPesHeader: NewPESPacket(),
 		packet:           utils.NewPacket(),
 	}
 }

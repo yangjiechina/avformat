@@ -13,7 +13,7 @@ type encodeHandler func(index int, data []byte, pts, dts int64)
 
 type stream struct {
 	streamType int
-	pesPacket  PESPacket
+	pesPacket  PESHeader
 }
 
 func (s stream) isAudio() bool {

@@ -483,7 +483,7 @@ func (h *ProgramStreamMap) ToBytes(dst []byte) int {
 	return offset
 }
 
-type PESPacket struct {
+type PESHeader struct {
 	streamId     byte
 	packetLength uint16
 
@@ -511,14 +511,14 @@ type PESPacket struct {
 	dts int64
 }
 
-func NewPESPacket() *PESPacket {
-	return &PESPacket{
+func NewPESPacket() *PESHeader {
+	return &PESHeader{
 		pts: -1,
 		dts: -1,
 	}
 }
 
-func (p *PESPacket) Reset() {
+func (p *PESHeader) Reset() {
 	//p.streamId = 0
 	p.packetLength = 0
 	p.pesScramblingControl = 0
@@ -541,7 +541,7 @@ func (p *PESPacket) Reset() {
 	//p.dts = -1
 }
 
-func (p *PESPacket) ToBytes(dst []byte) int {
+func (p *PESHeader) ToBytes(dst []byte) int {
 	dst[0] = 0x00
 	dst[1] = 0x00
 	dst[2] = 0x01
@@ -614,18 +614,14 @@ func (p *PESPacket) ToBytes(dst []byte) int {
 	return offset
 }
 
-func readPESPacket(p *PESPacket, src []byte) ([]byte, int) {
+func readPESHeader(p *PESHeader, src []byte) int {
 	length := len(src)
 	if length < 9 {
-		return nil, 0
+		return 0
 	}
 
 	p.streamId = src[3]
-	packetLength := int(utils.BytesToUInt16(src[4], src[5]))
-	totalLength := 6 + packetLength
-	if totalLength > length {
-		return nil, 0
-	}
+	p.packetLength = utils.BytesToUInt16(src[4], src[5])
 	//1011 1100 1 program_stream_map
 	//1011 1101 2 private_stream_1
 	//1011 1110 padding_stream
@@ -697,5 +693,5 @@ func readPESPacket(p *PESPacket, src []byte) ([]byte, int) {
 		offset += 3
 	}
 
-	return src[offset:totalLength], totalLength
+	return offset
 }

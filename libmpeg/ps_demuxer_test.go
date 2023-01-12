@@ -9,7 +9,7 @@ import (
 
 func TestDecodePS(t *testing.T) {
 	//path := "../1.raw"
-	path := "D:\\CProjects\\test3\\test7\\yushi.raw.video"
+	path := "D:/CProjects/test3/test7/yushi.raw.video"
 	fileObj, err := os.OpenFile(path+".h264", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 132)
 	if err != nil {
 		panic(err)
