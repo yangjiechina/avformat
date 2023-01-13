@@ -8,20 +8,31 @@ import (
 )
 
 func TestTSDeMuxer(t *testing.T) {
-	path := "../sample_1280x720.ts"
+	path := "../sample_1280x720_surfing_with_audio.ts"
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
-	h264File, _ := os.OpenFile(path+".h264", os.O_WRONLY|os.O_CREATE, 132)
+	videoOutputFile, _ := os.OpenFile(path+".video", os.O_WRONLY|os.O_CREATE, 132)
 	defer func() {
-		h264File.Close()
+		videoOutputFile.Close()
+	}()
+
+	audioOutputFile, _ := os.OpenFile(path+".audio", os.O_WRONLY|os.O_CREATE, 132)
+	defer func() {
+		audioOutputFile.Close()
 	}()
 
 	muxer := NewTSDeMuxer(func(buffer utils.ByteBuffer, keyFrame bool, streamType int, pts, dts int64) {
-		buffer.ReadTo(func(bytes []byte) {
-			h264File.Write(bytes)
-		})
+		if streamType == StreamIdH624 || streamType == StreamIdVideo {
+			buffer.ReadTo(func(bytes []byte) {
+				videoOutputFile.Write(bytes)
+			})
+		} else if streamType == StreamIdAudio {
+			buffer.ReadTo(func(bytes []byte) {
+				audioOutputFile.Write(bytes)
+			})
+		}
 	})
 
 	length := len(file)

@@ -94,7 +94,6 @@ func (t *TSDeMuxer) doRead(data []byte) error {
 		copy(t.esPacket[t.esLength:], data[i:])
 		t.esLength += len(data[i:])
 		t.currentPesPacket.Reset()
-		println(t.esLength)
 	}
 	return nil
 }
